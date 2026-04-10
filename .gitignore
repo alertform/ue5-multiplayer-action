@@ -1,0 +1,28 @@
+# UE5 gitignore
+Binaries/
+Build/
+DerivedDataCache/
+Intermediate/
+Saved/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Visual Studio
+.vs/
+*.user
+
+# Compiled files
+*.pdb
+*.exp
+*.lib
+
+# Keep
+!Source/
+!Config/
+!Content/*.uasset
+!Content/*.umap
+!*.uproject

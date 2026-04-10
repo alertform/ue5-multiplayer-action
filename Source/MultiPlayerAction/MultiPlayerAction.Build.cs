@@ -1,0 +1,19 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+using UnrealBuildTool;
+
+public class MultiPlayerAction : ModuleRules
+{
+	public MultiPlayerAction(ReadOnlyTargetRules Target) : base(Target)
+	{
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+
+		PublicDependencyModuleNames.AddRange(new string[] {
+			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
+			// GAS
+			"GameplayAbilities", "GameplayTags", "GameplayTasks",
+			// Networking
+			"NetCore", "OnlineSubsystem"
+		});
+	}
+}
