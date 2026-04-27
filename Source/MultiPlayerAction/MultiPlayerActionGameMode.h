@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
+#include "GameFramework/GameMode.h"
 #include "MultiPlayerActionGameMode.generated.h"
 
 UCLASS(minimalapi)
-class AMultiPlayerActionGameMode : public AGameModeBase
+class AMultiPlayerActionGameMode : public AGameMode
 {
 	GENERATED_BODY()
 

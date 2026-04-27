@@ -13,6 +13,8 @@
 #include "Player/MAPlayerState.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
+#include "AbilitySystemComponent.h"
+#include "GameplayTagContainer.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -34,6 +36,23 @@ void AMultiPlayerActionCharacter::PossessedBy(AController* NewController)
 		AbilitySystemComponent = Cast<UMAAbilitySystemComponent>(PS->GetAbilitySystemComponent());
 		AttributeSet = PS->GetAttributeSet();
 		PS->GetAbilitySystemComponent()->InitAbilityActorInfo(PS, this);
+		GiveDefaultAbilities();
+	}
+}
+
+void AMultiPlayerActionCharacter::GiveDefaultAbilities()
+{
+	if (!HasAuthority() || !AbilitySystemComponent)
+	{
+		return;
+	}
+
+	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DefaultAbilities)
+	{
+		if (AbilityClass)
+		{
+			AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1, INDEX_NONE, this));
+		}
 	}
 }
 
@@ -122,6 +141,12 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AMultiPlayerActionCharacter::Look);
+
+		// Attack
+		if (AttackAction)
+		{
+			EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnAttackInput);
+		}
 	}
 	else
 	{
@@ -162,5 +187,16 @@ void AMultiPlayerActionCharacter::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnAttackInput()
+{
+	if (AbilitySystemComponent)
+	{
+		// Try to activate any ability with the Ability.MeleeAttack tag
+		FGameplayTagContainer AbilityTags;
+		AbilityTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.MeleeAttack")));
+		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
 	}
 }

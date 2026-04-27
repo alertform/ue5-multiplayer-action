@@ -14,6 +14,7 @@ class UInputMappingContext;
 class UInputAction;
 class UMAAbilitySystemComponent;
 class UMAAttributeSet;
+class UGameplayAbility;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -47,6 +48,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+	/** Attack Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* AttackAction;
+
 public:
 	AMultiPlayerActionCharacter();
 
@@ -63,8 +68,15 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UMAAttributeSet> AttributeSet;
 
+	/** Default abilities granted on possess */
+	UPROPERTY(EditDefaultsOnly, Category = "GAS")
+	TArray<TSubclassOf<UGameplayAbility>> DefaultAbilities;
+
 	virtual void PossessedBy(AController* NewController) override;       // Server: init ASC
 	virtual void OnRep_PlayerState() override;                           // Client: init ASC
+
+	/** Grant default abilities to the ASC (server only) */
+	void GiveDefaultAbilities();
 	
 
 protected:
@@ -74,6 +86,9 @@ protected:
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
+
+	/** Called for attack input — activates first available melee ability */
+	void OnAttackInput();
 			
 
 protected:
