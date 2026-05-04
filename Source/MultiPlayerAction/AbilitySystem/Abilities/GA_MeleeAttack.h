@@ -41,11 +41,11 @@ protected:
 
 	/** Called when montage hits the "Attack" notify window */
 	UFUNCTION()
-	void OnMontageEvent(FGameplayTag EventTag, FGameplayEventData EventData);
+	void OnMontageEvent(FGameplayEventData EventData);
 
 	/** Called when montage completes or is interrupted */
 	UFUNCTION()
-	void OnMontageEnded(FGameplayTag EventTag, FGameplayEventData EventData);
+	void OnMontageEnded();
 
 private:
 	/** Perform sphere trace and apply damage to hit targets */

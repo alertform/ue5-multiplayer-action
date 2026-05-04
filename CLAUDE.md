@@ -61,9 +61,9 @@ AMultiPlayerActionCharacter (cached pointers only, no ownership)
 Input is wired through Enhanced Input → tag-based ability activation, not direct C++ binding to ability classes.
 
 1. `AMultiPlayerActionCharacter::SetupPlayerInputComponent` binds `AttackAction` to `OnAttackInput`.
-2. `OnAttackInput` calls `AbilitySystemComponent->TryActivateAbilitiesByTag` with tag `Ability.MeleeAttack`.
+2. `OnAttackInput` calls `AbilitySystemComponent->TryActivateAbilitiesByTag` with tag `Ability.Melee.Attack`.
 3. The ASC finds any granted ability whose `AbilityTags` contain that tag and activates it (currently only `UGA_MeleeAttack`).
-4. `UGA_MeleeAttack::ActivateAbility` plays an `AnimMontage` via `UAbilityTask_PlayMontageAndWait` and waits for an `Event.Attack` gameplay event (sent from an `AnimNotify` in the montage) via `UAbilityTask_WaitGameplayEvent`.
+4. `UGA_MeleeAttack::ActivateAbility` plays an `AnimMontage` via `UAbilityTask_PlayMontageAndWait` and waits for an `Event.Montage.Hit` gameplay event (sent from an `AnimNotify` in the montage) via `UAbilityTask_WaitGameplayEvent`.
 5. On the event, `PerformHitTrace` does a server-side sphere sweep and applies the configured `DamageEffect` GE to each hit ASC.
 
 **Adding a new ability:** subclass `UMAGameplayAbilityBase` (not `UGameplayAbility` directly — the base sets `InstancedPerActor` + `LocalPredicted` defaults and provides `GetMACharacter`). Set `AbilityTags` in the BP defaults so `TryActivateAbilitiesByTag` can find it. Bind a new input action and call `TryActivateAbilitiesByTag` with the matching tag.
@@ -92,8 +92,9 @@ Source/MultiPlayerAction/
 
 These tags must exist in the project's tag config (Project Settings → GameplayTags) for the system to function. Missing tags cause silent activation failures:
 
-- `Ability.MeleeAttack` — used by `OnAttackInput` to find the melee ability
-- `Event.Attack` — sent from the AttackMontage's AnimNotify to trigger hit detection
+- `Ability.Melee.Attack` — used by `OnAttackInput` to find the melee ability
+- `Event.Montage.Hit` — sent from the AttackMontage's AnimNotify to trigger hit detection
+- `Ability.Cooldown.Melee` — reserved for melee Cooldown GE (not yet referenced from C++)
 
 ## Testing
 

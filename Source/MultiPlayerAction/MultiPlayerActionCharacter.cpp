@@ -131,7 +131,7 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 {
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
+
 		// Jumping
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
@@ -194,9 +194,9 @@ void AMultiPlayerActionCharacter::OnAttackInput()
 {
 	if (AbilitySystemComponent)
 	{
-		// Try to activate any ability with the Ability.MeleeAttack tag
+		// Try to activate any ability with the Ability.Melee.Attack tag
 		FGameplayTagContainer AbilityTags;
-		AbilityTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.MeleeAttack")));
+		AbilityTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Melee.Attack")));
 		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
 	}
 }
