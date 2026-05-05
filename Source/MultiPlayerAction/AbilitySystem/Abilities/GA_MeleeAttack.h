@@ -27,6 +27,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
 	TObjectPtr<UAnimMontage> AttackMontage;
 
+	/** Play rate multiplier — increase to shorten attack duration (e.g. 2.0 = twice as fast) */
+	UPROPERTY(EditDefaultsOnly, Category = "Attack", meta = (ClampMin = "0.1", UIMin = "0.1", UIMax = "5.0"))
+	float MontagePlayRate = 2.0f;
+
 	/** Trace radius for hit detection */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
 	float TraceRadius = 50.f;
