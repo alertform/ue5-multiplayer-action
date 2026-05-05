@@ -12,7 +12,7 @@ AMAPlayerState::AMAPlayerState()
 	AttributeSet = CreateDefaultSubobject<UMAAttributeSet>(TEXT("AttributeSet"));
 
 	// PlayerState replication frequency — increase for responsive health bars
-	NetUpdateFrequency = 100.f;
+	SetNetUpdateFrequency(100.f);
 }
 
 UAbilitySystemComponent* AMAPlayerState::GetAbilitySystemComponent() const

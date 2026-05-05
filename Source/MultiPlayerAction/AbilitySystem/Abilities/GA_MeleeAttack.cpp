@@ -3,13 +3,18 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystem/MAGameplayTags.h"
 #include "MultiPlayerActionCharacter.h"
 
 UGA_MeleeAttack::UGA_MeleeAttack()
 {
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+
 	// Identify this ability by tag so TryActivateAbilitiesByTag can find it; BP children inherit this.
-	AbilityTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Melee.Attack")));
+	// UE 5.5+ deprecates direct AbilityTags mutation — use SetAssetTags in constructor only.
+	FGameplayTagContainer Tags;
+	Tags.AddTag(MAGameplayTags::Ability_Melee_Attack);
+	SetAssetTags(Tags);
 }
 
 void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -39,11 +44,9 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	MontageTask->OnCancelled.AddDynamic(this, &UGA_MeleeAttack::OnMontageEnded);
 	MontageTask->ReadyForActivation();
 
-	// Wait for "Event.Montage.Hit" gameplay event (sent from AnimNotify in montage)
-	FGameplayTag EventTag = FGameplayTag::RequestGameplayTag(FName("Event.Montage.Hit"));
-
+	// Wait for Event.Montage.Hit gameplay event (sent from AnimNotify in montage)
 	UAbilityTask_WaitGameplayEvent* EventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
-		this, EventTag);
+		this, MAGameplayTags::Event_Montage_Hit);
 
 	EventTask->EventReceived.AddDynamic(this, &UGA_MeleeAttack::OnMontageEvent);
 	EventTask->ReadyForActivation();

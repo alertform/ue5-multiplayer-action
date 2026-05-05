@@ -14,20 +14,20 @@ UE5 projects build via UnrealBuildTool, not directly via MSBuild on the .sln. Th
 
 ```bash
 # Regenerate VS/Rider project files after adding/removing .cpp/.h or editing Build.cs
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe" \
+"D:/Epic Games/UE_5.5/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe" \
   -projectfiles -project="F:/MultiPlayerAction/MultiPlayerAction.uproject" -game -rocket -progress
 
 # Build editor (Development Editor, Win64) — required after C++ changes before launching the editor
-"C:/Program Files/Epic Games/UE_5.5/Engine/Build/BatchFiles/Build.bat" \
+"D:/Epic Games/UE_5.5/Engine/Build/BatchFiles/Build.bat" \
   MultiPlayerActionEditor Win64 Development \
   -Project="F:/MultiPlayerAction/MultiPlayerAction.uproject" -WaitMutex -FromMsBuild
 
 # Launch editor with this project
-"C:/Program Files/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor.exe" \
+"D:/Epic Games/UE_5.5/Engine/Binaries/Win64/UnrealEditor.exe" \
   "F:/MultiPlayerAction/MultiPlayerAction.uproject"
 
 # Cook + package shipping build
-"C:/Program Files/Epic Games/UE_5.5/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun \
+"D:/Epic Games/UE_5.5/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun \
   -project="F:/MultiPlayerAction/MultiPlayerAction.uproject" \
   -platform=Win64 -clientconfig=Shipping -cook -build -stage -package -archive \
   -archivedirectory="F:/MultiPlayerAction/Builds"
@@ -80,7 +80,10 @@ Source/MultiPlayerAction/
 ├── Player/MAPlayerState.{h,cpp}       # Owns ASC + AttributeSet
 └── AbilitySystem/
     ├── MAAbilitySystemComponent.h     # Subclass hook (currently empty)
-    ├── MAAttributeSet.{h,cpp}         # Replicated attributes
+    ├── MAAttributeSet.{h,cpp}         # Replicated attributes + PostGameplayEffectExecute clamp
+    ├── MAGameplayTags.{h,cpp}         # Native gameplay tags — single source of truth
+    ├── AnimNotifies/
+    │   └── AN_SendGameplayEvent.{h,cpp}  # Montage notify -> SendGameplayEventToActor
     └── Abilities/
         ├── MAGameplayAbilityBase.{h,cpp}  # Base for all GAs
         └── GA_MeleeAttack.{h,cpp}         # Reference ability impl
@@ -88,13 +91,19 @@ Source/MultiPlayerAction/
 
 `Content/` holds the BP_ThirdPersonCharacter Blueprint that derives from `AMultiPlayerActionCharacter` (set as `DefaultPawnClass` in the GameMode via `ConstructorHelpers::FClassFinder`). Do not add direct content references in C++ — keep them in the Blueprint defaults.
 
-## Required Gameplay Tags
+## Gameplay Tags
 
-These tags must exist in the project's tag config (Project Settings → GameplayTags) for the system to function. Missing tags cause silent activation failures:
+**Canonical source: `Source/MultiPlayerAction/AbilitySystem/MAGameplayTags.{h,cpp}` — native tags via `UE_DECLARE_GAMEPLAY_TAG_EXTERN` / `UE_DEFINE_GAMEPLAY_TAG_COMMENT`.** Never use string-based `FGameplayTag::RequestGameplayTag(FName("..."))` in C++ — typos become compile errors with native tags, silent runtime failures with strings.
 
-- `Ability.Melee.Attack` — used by `OnAttackInput` to find the melee ability
-- `Event.Montage.Hit` — sent from the AttackMontage's AnimNotify to trigger hit detection
-- `Ability.Cooldown.Melee` — reserved for melee Cooldown GE (not yet referenced from C++)
+`Config/DefaultGameplayTags.ini` is preserved for BP picker convenience but C++ does not depend on it.
+
+Currently registered native tags:
+
+- `MAGameplayTags::Ability_Melee_Attack` (`Ability.Melee.Attack`) — set in `UGA_MeleeAttack` ctor; matched by `OnAttackInput`'s `TryActivateAbilitiesByTag`
+- `MAGameplayTags::Ability_Cooldown_Melee` (`Ability.Cooldown.Melee`) — granted by `BP_GE_Cooldown_Melee` GE; consumed automatically by `CommitAbility`/`CommitCooldown` when set as the GA's `CooldownGameplayEffectClass`
+- `MAGameplayTags::Event_Montage_Hit` (`Event.Montage.Hit`) — sent from `UAN_SendGameplayEvent` AnimNotify on `AM_MeleeAttack` to wake `WaitGameplayEvent`
+
+**Adding a new tag:** declare in `MAGameplayTags.h` (`UE_DECLARE_GAMEPLAY_TAG_EXTERN`), define in `.cpp` (`UE_DEFINE_GAMEPLAY_TAG_COMMENT` with the dotted string + a doc comment). C++ refers to the symbol; engine registers it automatically at static-init time.
 
 ## Testing
 

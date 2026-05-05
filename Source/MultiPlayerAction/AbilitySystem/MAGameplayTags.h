@@ -1,0 +1,20 @@
+#pragma once
+
+#include "NativeGameplayTags.h"
+
+/**
+ * Native gameplay tags for the MultiPlayerAction module.
+ * Use these typed references everywhere — string-based RequestGameplayTag is forbidden once a tag has a native counterpart.
+ * Compile-time errors here mean the tag identifier is wrong; gone are the days of silent runtime failures.
+ */
+namespace MAGameplayTags
+{
+	// Ability identification tags — used by TryActivateAbilitiesByTag and as AbilityTags on GAs.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Melee_Attack);
+
+	// Cooldown tags — granted by Cooldown GE, blocks re-activation while present on the ASC.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Melee);
+
+	// Gameplay event tags — sent from AnimNotify -> WaitGameplayEvent task.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_Hit);
+}

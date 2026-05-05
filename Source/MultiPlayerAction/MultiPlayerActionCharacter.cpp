@@ -13,6 +13,7 @@
 #include "Player/MAPlayerState.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
+#include "AbilitySystem/MAGameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayTagContainer.h"
 
@@ -194,9 +195,8 @@ void AMultiPlayerActionCharacter::OnAttackInput()
 {
 	if (AbilitySystemComponent)
 	{
-		// Try to activate any ability with the Ability.Melee.Attack tag
 		FGameplayTagContainer AbilityTags;
-		AbilityTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Melee.Attack")));
+		AbilityTags.AddTag(MAGameplayTags::Ability_Melee_Attack);
 		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
 	}
 }
