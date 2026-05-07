@@ -11,11 +11,13 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Player/MAPlayerState.h"
+#include "Player/MAPlayerController.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
 #include "AbilitySystem/MAGameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayTagContainer.h"
+#include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -53,6 +55,18 @@ void AMultiPlayerActionCharacter::GiveDefaultAbilities()
 		if (AbilityClass)
 		{
 			AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1, INDEX_NONE, this));
+		}
+	}
+
+	// Apply Stamina regen once on possess; Periodic Infinite GE auto-loops
+	if (StaminaRegenEffect)
+	{
+		FGameplayEffectContextHandle Ctx = AbilitySystemComponent->MakeEffectContext();
+		Ctx.AddSourceObject(this);
+		FGameplayEffectSpecHandle Spec = AbilitySystemComponent->MakeOutgoingSpec(StaminaRegenEffect, 1.f, Ctx);
+		if (Spec.IsValid())
+		{
+			AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 		}
 	}
 }
@@ -198,5 +212,45 @@ void AMultiPlayerActionCharacter::OnAttackInput()
 		FGameplayTagContainer AbilityTags;
 		AbilityTags.AddTag(MAGameplayTags::Ability_Melee_Attack);
 		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+// IMACombatantInterface
+
+void AMultiPlayerActionCharacter::HandleDeath_Implementation()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// Tell every client (including server) to ragdoll locally — component state doesn't replicate
+	Multicast_PlayDeath();
+
+	if (AMAPlayerController* PC = Cast<AMAPlayerController>(GetController()))
+	{
+		PC->ScheduleRespawn(3.f);
+	}
+
+	SetLifeSpan(5.f);
+}
+
+void AMultiPlayerActionCharacter::Multicast_PlayDeath_Implementation()
+{
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->SetCollisionProfileName(TEXT("Ragdoll"));
+		SkelMesh->SetSimulatePhysics(true);
+		SkelMesh->WakeAllRigidBodies();
+	}
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->DisableMovement();
+		Move->SetComponentTickEnabled(false);
 	}
 }

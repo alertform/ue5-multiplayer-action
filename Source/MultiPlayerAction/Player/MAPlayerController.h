@@ -26,6 +26,17 @@ public:
 	UFUNCTION(Exec)
 	void DamageSelf(float Amount = 10.f);
 
+	/** Server RPC backing DamageSelf — ensures the authoritative ASC is the one mutated */
+	UFUNCTION(Server, Reliable)
+	void Server_DamageSelf(float Amount);
+
+	/** Server-only: queue Respawn() to fire after Delay seconds */
+	void ScheduleRespawn(float Delay);
+
+protected:
+	void Respawn();
+	FTimerHandle RespawnTimerHandle;
+
 protected:
 	/** HUD widget class (set in BP_MAPlayerController defaults to WBP_HUD) */
 	UPROPERTY(EditDefaultsOnly, Category = "UI")

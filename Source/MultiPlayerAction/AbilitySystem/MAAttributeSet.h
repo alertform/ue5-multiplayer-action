@@ -24,6 +24,9 @@ public:
 
 	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData& Data) override;
 
+	/** Static death gate. Call after ANY Health mutation (GE path or direct SetNumericAttributeBase). */
+	static void CheckDeath(class UAbilitySystemComponent* ASC);
+
 	// Health
 	UPROPERTY(BlueprintReadOnly, Category = "Attributes", ReplicatedUsing = OnRep_Health)
 	FGameplayAttributeData Health;

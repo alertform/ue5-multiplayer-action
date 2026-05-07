@@ -2,8 +2,12 @@
 #include "Player/MAPlayerState.h"
 #include "UI/MAUserWidget.h"
 #include "AbilitySystem/MAAttributeSet.h"
+#include "AbilitySystem/MAGameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
+#include "GameFramework/GameModeBase.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
 #include "UObject/ConstructorHelpers.h"
 
 AMAPlayerController::AMAPlayerController()
@@ -31,7 +35,52 @@ void AMAPlayerController::OnRep_PlayerState()
 	EnsureHUDInitialized();
 }
 
+void AMAPlayerController::ScheduleRespawn(float Delay)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMAPlayerController::Respawn, Delay, false);
+}
+
+void AMAPlayerController::Respawn()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (AMAPlayerState* PS = GetPlayerState<AMAPlayerState>())
+	{
+		if (UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent())
+		{
+			ASC->RemoveLooseGameplayTag(MAGameplayTags::State_Dead);
+			ASC->SetNumericAttributeBase(UMAAttributeSet::GetHealthAttribute(), 100.f);
+			ASC->SetNumericAttributeBase(UMAAttributeSet::GetStaminaAttribute(), 100.f);
+		}
+	}
+
+	// Detach from the ragdoll so RestartPlayer actually spawns a NEW pawn
+	// (default impl just teleports the existing pawn if one is still attached)
+	if (GetPawn())
+	{
+		UnPossess();
+	}
+
+	if (AGameModeBase* GM = GetWorld()->GetAuthGameMode())
+	{
+		GM->RestartPlayer(this);
+	}
+}
+
 void AMAPlayerController::DamageSelf(float Amount)
+{
+	// Exec runs on the local PC; route to server RPC so the authoritative ASC is the one mutated
+	Server_DamageSelf(Amount);
+}
+
+void AMAPlayerController::Server_DamageSelf_Implementation(float Amount)
 {
 	AMAPlayerState* PS = GetPlayerState<AMAPlayerState>();
 	if (!PS) return;
@@ -40,6 +89,9 @@ void AMAPlayerController::DamageSelf(float Amount)
 
 	const float Cur = ASC->GetNumericAttribute(UMAAttributeSet::GetHealthAttribute());
 	ASC->SetNumericAttributeBase(UMAAttributeSet::GetHealthAttribute(), FMath::Max(0.f, Cur - Amount));
+
+	// Direct SetNumericAttributeBase bypasses the GE pipeline — manually trip the death check
+	UMAAttributeSet::CheckDeath(ASC);
 }
 
 void AMAPlayerController::EnsureHUDInitialized()

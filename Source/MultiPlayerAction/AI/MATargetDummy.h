@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
+#include "AbilitySystem/MACombatantInterface.h"
 #include "MATargetDummy.generated.h"
 
 class UMAAbilitySystemComponent;
@@ -11,9 +12,10 @@ class UMAAttributeSet;
 /**
  * Stationary practice dummy. Owns its own ASC + AttributeSet (no PlayerState),
  * so melee Damage GE can resolve a valid target ASC and we can verify the loop in PIE.
+ * On death: ragdolls, hides for RespawnDelay seconds, then restores Health to MaxHealth.
  */
 UCLASS()
-class MULTIPLAYERACTION_API AMATargetDummy : public ACharacter, public IAbilitySystemInterface
+class MULTIPLAYERACTION_API AMATargetDummy : public ACharacter, public IAbilitySystemInterface, public IMACombatantInterface
 {
 	GENERATED_BODY()
 
@@ -25,10 +27,28 @@ public:
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
+	// IMACombatantInterface
+	virtual void HandleDeath_Implementation() override;
+
+	/** All clients run their own ragdoll setup — local component state doesn't replicate */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayDeath();
+
+	/** All clients clear their own ragdoll on respawn */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_ResetVisuals();
+
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "GAS")
 	TObjectPtr<UMAAbilitySystemComponent> AbilitySystemComponent;
 
 	UPROPERTY()
 	TObjectPtr<UMAAttributeSet> AttributeSet;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	float RespawnDelay = 5.f;
+
+	FTimerHandle RespawnTimerHandle;
+
+	void Respawn();
 };

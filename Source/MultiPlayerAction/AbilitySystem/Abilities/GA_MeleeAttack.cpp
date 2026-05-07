@@ -15,6 +15,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	FGameplayTagContainer Tags;
 	Tags.AddTag(MAGameplayTags::Ability_Melee_Attack);
 	SetAssetTags(Tags);
+
+	// Cannot attack while dead — checked at TryActivate time, no need for runtime guard
+	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);
 }
 
 void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -113,5 +116,15 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 		{
 			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 		}
+
+		// Fire hit-impact cue with hit location + normal so FX spawn at exact contact point.
+		// Static cue notify (BP_GCN_MeleeHit) routes by tag and replicates to all relevant clients.
+		FGameplayCueParameters CueParams;
+		CueParams.Location = Hit.ImpactPoint;
+		CueParams.Normal = Hit.ImpactNormal;
+		CueParams.PhysicalMaterial = Hit.PhysMaterial;
+		CueParams.Instigator = Character;
+		CueParams.EffectCauser = Character;
+		SourceASC->ExecuteGameplayCue(MAGameplayTags::GameplayCue_Melee_Hit, CueParams);
 	}
 }

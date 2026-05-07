@@ -1,6 +1,9 @@
 #include "AbilitySystem/MAAttributeSet.h"
 #include "Net/UnrealNetwork.h"
 #include "GameplayEffectExtension.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystem/MACombatantInterface.h"
+#include "AbilitySystem/MAGameplayTags.h"
 
 UMAAttributeSet::UMAAttributeSet()
 {
@@ -24,14 +27,33 @@ void UMAAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 {
 	Super::PostGameplayEffectExecute(Data);
 
-	// Clamp attributes to valid ranges after every GE execution.
 	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
 		SetHealth(FMath::Clamp(GetHealth(), 0.f, GetMaxHealth()));
+		CheckDeath(Data.Target.AbilityActorInfo->AbilitySystemComponent.Get());
 	}
 	else if (Data.EvaluatedData.Attribute == GetStaminaAttribute())
 	{
-		SetStamina(FMath::Max(GetStamina(), 0.f));
+		// Hardcoded upper bound 100 — promote to a MaxStamina attribute later if needed
+		SetStamina(FMath::Clamp(GetStamina(), 0.f, 100.f));
+	}
+}
+
+void UMAAttributeSet::CheckDeath(UAbilitySystemComponent* ASC)
+{
+	if (!ASC) return;
+	if (ASC->HasMatchingGameplayTag(MAGameplayTags::State_Dead)) return;
+	if (ASC->GetNumericAttribute(GetHealthAttribute()) > 0.f) return;
+
+	AActor* AvatarActor = ASC->GetAvatarActor_Direct();
+	if (!AvatarActor) return;
+
+	ASC->AddLooseGameplayTag(MAGameplayTags::State_Dead);
+	ASC->CancelAbilities();
+
+	if (AvatarActor->Implements<UMACombatantInterface>())
+	{
+		IMACombatantInterface::Execute_HandleDeath(AvatarActor);
 	}
 }
 

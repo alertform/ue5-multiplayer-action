@@ -10,4 +10,10 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_Hit, "Event.Montage.Hit",
 		"GameplayEvent sent from AnimNotify on AM_MeleeAttack to trigger PerformHitTrace");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Melee_Hit, "GameplayCue.Melee.Hit",
+		"Hit-impact FX cue executed from UGA_MeleeAttack with FHitResult location/normal — drives BP_GCN_MeleeHit");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dead, "State.Dead",
+		"Loose tag added when Health reaches 0; gate ability activation and dedupe death handling");
 }

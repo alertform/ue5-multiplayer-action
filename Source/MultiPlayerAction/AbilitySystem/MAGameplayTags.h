@@ -17,4 +17,10 @@ namespace MAGameplayTags
 
 	// Gameplay event tags — sent from AnimNotify -> WaitGameplayEvent task.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_Hit);
+
+	// GameplayCue tags — engine routes "GameplayCue.*" tags to GameplayCueManager for FX.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Melee_Hit);
+
+	// State tags — applied as loose tags during runtime; gate ability activation, drive UI/AI states.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dead);
 }

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
+#include "AbilitySystem/MACombatantInterface.h"
 #include "Logging/LogMacros.h"
 #include "MultiPlayerActionCharacter.generated.h"
 
@@ -20,7 +21,7 @@ struct FInputActionValue;
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS(config=Game)
-class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInterface
+class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInterface, public IMACombatantInterface
 {
 	GENERATED_BODY()
 
@@ -60,6 +61,13 @@ public:
 
 	UMAAttributeSet* GetAttributeSet() const { return AttributeSet; }
 
+	// IMACombatantInterface
+	virtual void HandleDeath_Implementation() override;
+
+	/** All clients run their own ragdoll setup — local component state doesn't replicate */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayDeath();
+
 protected:
 	// Cached pointers — ASC actually lives on PlayerState
 	UPROPERTY()
@@ -71,6 +79,10 @@ protected:
 	/** Default abilities granted on possess */
 	UPROPERTY(EditDefaultsOnly, Category = "GAS")
 	TArray<TSubclassOf<UGameplayAbility>> DefaultAbilities;
+
+	/** Periodic Infinite GE applied on possess to tick Stamina regen — set to BP_GE_StaminaRegen */
+	UPROPERTY(EditDefaultsOnly, Category = "GAS")
+	TSubclassOf<class UGameplayEffect> StaminaRegenEffect;
 
 	virtual void PossessedBy(AController* NewController) override;       // Server: init ASC
 	virtual void OnRep_PlayerState() override;                           // Client: init ASC
