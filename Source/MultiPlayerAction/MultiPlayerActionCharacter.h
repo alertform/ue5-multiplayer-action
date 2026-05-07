@@ -77,7 +77,7 @@ protected:
 
 	/** Grant default abilities to the ASC (server only) */
 	void GiveDefaultAbilities();
-	
+
 
 protected:
 

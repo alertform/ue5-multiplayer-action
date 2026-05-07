@@ -15,7 +15,9 @@ public class MultiPlayerAction : ModuleRules
 			// GAS
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			// Networking
-			"NetCore", "OnlineSubsystem"
+			"NetCore", "OnlineSubsystem",
+			// UI
+			"UMG", "Slate", "SlateCore"
 		});
 	}
 }
