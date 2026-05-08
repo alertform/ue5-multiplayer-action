@@ -53,6 +53,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* AttackAction;
 
+	/** Sprint Input Action — Hold trigger; press starts sprint, release ends */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SprintAction;
+
 public:
 	AMultiPlayerActionCharacter();
 
@@ -101,6 +105,9 @@ protected:
 
 	/** Called for attack input — activates first available melee ability */
 	void OnAttackInput();
+
+	void OnSprintPressed();
+	void OnSprintReleased();
 			
 
 protected:

@@ -18,6 +18,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 
 	// Cannot attack while dead — checked at TryActivate time, no need for runtime guard
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);
+
+	// Attacking auto-cancels active sprint (multi-ability interrupt demo)
+	CancelAbilitiesWithTag.AddTag(MAGameplayTags::Ability_Movement_Sprint);
 }
 
 void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,

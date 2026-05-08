@@ -16,4 +16,7 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dead, "State.Dead",
 		"Loose tag added when Health reaches 0; gate ability activation and dedupe death handling");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Movement_Sprint, "Ability.Movement.Sprint",
+		"Activation + asset tag for UGA_Sprint; GA_MeleeAttack lists this in CancelAbilitiesWithTag to interrupt sprint on attack");
 }

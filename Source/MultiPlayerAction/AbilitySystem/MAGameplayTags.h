@@ -23,4 +23,7 @@ namespace MAGameplayTags
 
 	// State tags — applied as loose tags during runtime; gate ability activation, drive UI/AI states.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dead);
+
+	// Sprint ability identification — used by GA_MeleeAttack's CancelAbilitiesWithTag to interrupt sprint on attack.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Movement_Sprint);
 }

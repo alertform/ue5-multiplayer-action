@@ -162,6 +162,13 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 		{
 			EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnAttackInput);
 		}
+
+		// Sprint — Triggered (Hold) keeps activating; Completed (release) cancels
+		if (SprintAction)
+		{
+			EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnSprintPressed);
+			EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AMultiPlayerActionCharacter::OnSprintReleased);
+		}
 	}
 	else
 	{
@@ -212,6 +219,26 @@ void AMultiPlayerActionCharacter::OnAttackInput()
 		FGameplayTagContainer AbilityTags;
 		AbilityTags.AddTag(MAGameplayTags::Ability_Melee_Attack);
 		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnSprintPressed()
+{
+	if (AbilitySystemComponent)
+	{
+		FGameplayTagContainer AbilityTags;
+		AbilityTags.AddTag(MAGameplayTags::Ability_Movement_Sprint);
+		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnSprintReleased()
+{
+	if (AbilitySystemComponent)
+	{
+		FGameplayTagContainer AbilityTags;
+		AbilityTags.AddTag(MAGameplayTags::Ability_Movement_Sprint);
+		AbilitySystemComponent->CancelAbilities(&AbilityTags);
 	}
 }
 
