@@ -14,6 +14,8 @@ public class MultiPlayerAction : ModuleRules
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
 			// GAS
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
+			// AI
+			"AIModule",
 			// Networking
 			"NetCore", "OnlineSubsystem",
 			// UI

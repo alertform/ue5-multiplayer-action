@@ -1,9 +1,11 @@
 #include "AI/MATargetDummy.h"
+#include "AI/MAEnemyController.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
 #include "AbilitySystem/MAGameplayTags.h"
 #include "UI/MAUserWidget.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbility.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
@@ -18,9 +20,9 @@ AMATargetDummy::AMATargetDummy()
 	bReplicates = true;
 	SetReplicateMovement(true);
 
-	// Stand still — no controller possesses it
-	AutoPossessAI = EAutoPossessAI::Disabled;
-	AIControllerClass = nullptr;
+	// AI possess on spawn — drives the melee attack loop via MAEnemyController
+	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+	AIControllerClass = AMAEnemyController::StaticClass();
 
 	AbilitySystemComponent = CreateDefaultSubobject<UMAAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
@@ -53,11 +55,30 @@ void AMATargetDummy::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Ensure starting Health = MaxHealth on the server
-	if (HasAuthority() && AttributeSet)
+	// Server-only: init attributes, grant abilities, apply regen GE
+	if (HasAuthority() && AttributeSet && AbilitySystemComponent)
 	{
 		AttributeSet->InitHealth(AttributeSet->GetMaxHealth());
 		AttributeSet->InitStamina(100.f);
+
+		for (const TSubclassOf<UGameplayAbility>& AbilityClass : DefaultAbilities)
+		{
+			if (AbilityClass)
+			{
+				AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1, INDEX_NONE, this));
+			}
+		}
+
+		if (StaminaRegenEffect)
+		{
+			FGameplayEffectContextHandle Ctx = AbilitySystemComponent->MakeEffectContext();
+			Ctx.AddSourceObject(this);
+			FGameplayEffectSpecHandle Spec = AbilitySystemComponent->MakeOutgoingSpec(StaminaRegenEffect, 1.f, Ctx);
+			if (Spec.IsValid())
+			{
+				AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+			}
+		}
 	}
 
 	// Bind the floating health bar widget to this dummy's ASC. Each client runs locally

@@ -67,26 +67,28 @@ void UGA_MeleeAttack::OnMontageEnded()
 
 void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo)
 {
-	AMultiPlayerActionCharacter* Character = GetMACharacter(ActorInfo);
-	if (!Character)
+	// Use AvatarActor (any AActor) instead of casting to AMultiPlayerActionCharacter,
+	// so AI-controlled pawns (TargetDummy) can use the same GA class as players.
+	AActor* Avatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	if (!Avatar)
 	{
 		return;
 	}
 
 	// Only do authoritative hit detection on server (or standalone)
-	if (!Character->HasAuthority())
+	if (!Avatar->HasAuthority())
 	{
 		return;
 	}
 
-	const FVector Start = Character->GetActorLocation() + Character->GetActorForwardVector() * 50.f;
-	const FVector End = Start + Character->GetActorForwardVector() * TraceDistance;
+	const FVector Start = Avatar->GetActorLocation() + Avatar->GetActorForwardVector() * 50.f;
+	const FVector End = Start + Avatar->GetActorForwardVector() * TraceDistance;
 
 	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(Character);
+	QueryParams.AddIgnoredActor(Avatar);
 
 	TArray<FHitResult> HitResults;
-	const bool bHit = Character->GetWorld()->SweepMultiByChannel(
+	const bool bHit = Avatar->GetWorld()->SweepMultiByChannel(
 		HitResults, Start, End, FQuat::Identity,
 		ECC_Pawn, FCollisionShape::MakeSphere(TraceRadius), QueryParams);
 
@@ -98,7 +100,7 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 	for (const FHitResult& Hit : HitResults)
 	{
 		AActor* HitActor = Hit.GetActor();
-		if (!HitActor || HitActor == Character)
+		if (!HitActor || HitActor == Avatar)
 		{
 			continue;
 		}
@@ -123,8 +125,8 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 		CueParams.Location = Hit.ImpactPoint;
 		CueParams.Normal = Hit.ImpactNormal;
 		CueParams.PhysicalMaterial = Hit.PhysMaterial;
-		CueParams.Instigator = Character;
-		CueParams.EffectCauser = Character;
+		CueParams.Instigator = Avatar;
+		CueParams.EffectCauser = Avatar;
 		SourceASC->ExecuteGameplayCue(MAGameplayTags::GameplayCue_Melee_Hit, CueParams);
 	}
 }

@@ -53,6 +53,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Combat")
 	float RespawnDelay = 5.f;
 
+	/** Abilities granted on possess so AI can activate them via tag (set BP_GA_MeleeAttack here) */
+	UPROPERTY(EditDefaultsOnly, Category = "GAS")
+	TArray<TSubclassOf<class UGameplayAbility>> DefaultAbilities;
+
+	/** Periodic Infinite GE applied on possess to tick Stamina regen — set to BP_GE_StaminaRegen */
+	UPROPERTY(EditDefaultsOnly, Category = "GAS")
+	TSubclassOf<class UGameplayEffect> StaminaRegenEffect;
+
 	FTimerHandle RespawnTimerHandle;
 
 	void Respawn();
