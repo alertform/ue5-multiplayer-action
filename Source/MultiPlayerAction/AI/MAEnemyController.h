@@ -4,16 +4,15 @@
 #include "AIController.h"
 #include "MAEnemyController.generated.h"
 
+class UBehaviorTree;
+
 /**
- * Minimal AI controller for melee enemies. On Possess, starts a periodic timer
- * that finds the nearest player, faces them, and tries to activate the melee
- * ability via tag — sharing the SAME UGA_MeleeAttack class with the player.
+ * AI controller for melee enemies. On Possess, runs the configured BehaviorTree.
  *
- * This is the headline GAS proof point: AI and player drive identical
- * GameplayAbility classes through TryActivateAbilitiesByTag, no duplicate code.
- *
- * Upgrade path: replace timer-driven loop with BehaviorTree + custom BTTask
- * that calls TryActivateAbilitiesByTag (Lyra-style).
+ * The BT graph itself drives the per-tick logic via custom nodes (UBTService_UpdateTargetInfo
+ * + UBTTask_TryActivateAbilityByTag) — designer can edit composition in BT editor without
+ * recompiling C++. Headline GAS+BT integration: BTTask_TryActivateAbilityByTag drives the
+ * SAME UGameplayAbility class the player uses through input.
  */
 UCLASS()
 class MULTIPLAYERACTION_API AMAEnemyController : public AAIController
@@ -25,15 +24,7 @@ public:
 	virtual void OnUnPossess() override;
 
 protected:
-	/** How often (seconds) to evaluate the attack condition */
+	/** BehaviorTree to run on possess. Set in BP_EnemyController defaults to BT_Enemy. */
 	UPROPERTY(EditDefaultsOnly, Category = "AI")
-	float EvalInterval = 1.5f;
-
-	/** Player must be within this many units to trigger an attack */
-	UPROPERTY(EditDefaultsOnly, Category = "AI")
-	float AttackRange = 250.f;
-
-	FTimerHandle EvalTimer;
-
-	void EvaluateAndAttack();
+	TObjectPtr<UBehaviorTree> BehaviorTreeAsset;
 };
