@@ -11,6 +11,8 @@ UMAAttributeSet::UMAAttributeSet()
 	InitMaxHealth(100.f);
 	InitStamina(100.f);
 	InitAttackPower(20.f);
+	InitArmor(10.f);
+	// Damage is a meta attribute — never init, never replicate
 }
 
 void UMAAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -21,14 +23,29 @@ void UMAAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME_CONDITION_NOTIFY(UMAAttributeSet, MaxHealth, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UMAAttributeSet, Stamina, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UMAAttributeSet, AttackPower, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMAAttributeSet, Armor, COND_None, REPNOTIFY_Always);
+	// Damage is meta — not replicated
 }
 
 void UMAAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
 	Super::PostGameplayEffectExecute(Data);
 
-	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
 	{
+		// Meta attribute: route incoming Damage to Health, then zero Damage so it doesn't accumulate.
+		// Lyra ULyraHealthSet::PostGameplayEffectExecute follows the same pattern.
+		const float Incoming = GetDamage();
+		SetDamage(0.f);
+		if (Incoming > 0.f)
+		{
+			SetHealth(FMath::Clamp(GetHealth() - Incoming, 0.f, GetMaxHealth()));
+			CheckDeath(Data.Target.AbilityActorInfo->AbilitySystemComponent.Get());
+		}
+	}
+	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+	{
+		// Direct Health writes (DamageSelf cheat / heal GE) — clamp + death check
 		SetHealth(FMath::Clamp(GetHealth(), 0.f, GetMaxHealth()));
 		CheckDeath(Data.Target.AbilityActorInfo->AbilitySystemComponent.Get());
 	}
@@ -75,4 +92,9 @@ void UMAAttributeSet::OnRep_Stamina(const FGameplayAttributeData& OldStamina)
 void UMAAttributeSet::OnRep_AttackPower(const FGameplayAttributeData& OldAttackPower)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UMAAttributeSet, AttackPower, OldAttackPower);
+}
+
+void UMAAttributeSet::OnRep_Armor(const FGameplayAttributeData& OldArmor)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMAAttributeSet, Armor, OldArmor);
 }

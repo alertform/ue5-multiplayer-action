@@ -46,6 +46,17 @@ public:
 	FGameplayAttributeData AttackPower;
 	ATTRIBUTE_ACCESSORS(UMAAttributeSet, AttackPower)
 
+	// Armor — physical mitigation; final damage = AttackPower * (1 - Armor * ArmorScale)
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes", ReplicatedUsing = OnRep_Armor)
+	FGameplayAttributeData Armor;
+	ATTRIBUTE_ACCESSORS(UMAAttributeSet, Armor)
+
+	// Damage — META attribute: not replicated, not init, only used as a transient bucket
+	// during a damage GE execution. AS PostGameplayEffectExecute routes Damage to Health.
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes")
+	FGameplayAttributeData Damage;
+	ATTRIBUTE_ACCESSORS(UMAAttributeSet, Damage)
+
 protected:
 	UFUNCTION()
 	void OnRep_Health(const FGameplayAttributeData& OldHealth);
@@ -58,4 +69,7 @@ protected:
 
 	UFUNCTION()
 	void OnRep_AttackPower(const FGameplayAttributeData& OldAttackPower);
+
+	UFUNCTION()
+	void OnRep_Armor(const FGameplayAttributeData& OldArmor);
 };

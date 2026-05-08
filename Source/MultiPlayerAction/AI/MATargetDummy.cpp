@@ -2,9 +2,11 @@
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
 #include "AbilitySystem/MAGameplayTags.h"
+#include "UI/MAUserWidget.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/WidgetComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
@@ -26,6 +28,14 @@ AMATargetDummy::AMATargetDummy()
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
 	AttributeSet = CreateDefaultSubobject<UMAAttributeSet>(TEXT("AttributeSet"));
+
+	// Floating health bar — Widget Class assigned in BP_TargetDummy defaults
+	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
+	HealthBarWidget->SetupAttachment(GetCapsuleComponent());
+	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 110.f));
+	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	HealthBarWidget->SetDrawSize(FVector2D(150.f, 20.f));
+	HealthBarWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void AMATargetDummy::PostInitializeComponents()
@@ -48,6 +58,16 @@ void AMATargetDummy::BeginPlay()
 	{
 		AttributeSet->InitHealth(AttributeSet->GetMaxHealth());
 		AttributeSet->InitStamina(100.f);
+	}
+
+	// Bind the floating health bar widget to this dummy's ASC. Each client runs locally
+	// — widget instance lives in viewport, ASC replicates, attribute change delegate fires.
+	if (HealthBarWidget)
+	{
+		if (UMAUserWidget* Widget = Cast<UMAUserWidget>(HealthBarWidget->GetUserWidgetObject()))
+		{
+			Widget->InitFromASC(AbilitySystemComponent);
+		}
 	}
 }
 

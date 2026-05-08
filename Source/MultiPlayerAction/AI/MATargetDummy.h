@@ -8,6 +8,7 @@
 
 class UMAAbilitySystemComponent;
 class UMAAttributeSet;
+class UWidgetComponent;
 
 /**
  * Stationary practice dummy. Owns its own ASC + AttributeSet (no PlayerState),
@@ -44,6 +45,10 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UMAAttributeSet> AttributeSet;
+
+	/** Floating health bar above the dummy. BP defaults set Widget Class = WBP_EnemyHealthBar */
+	UPROPERTY(VisibleAnywhere, Category = "UI")
+	TObjectPtr<UWidgetComponent> HealthBarWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Combat")
 	float RespawnDelay = 5.f;
