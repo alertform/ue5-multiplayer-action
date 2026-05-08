@@ -10,8 +10,10 @@ UMAAttributeSet::UMAAttributeSet()
 	InitHealth(100.f);
 	InitMaxHealth(100.f);
 	InitStamina(100.f);
+	InitMaxStamina(100.f);
 	InitAttackPower(20.f);
 	InitArmor(10.f);
+	InitMoveSpeed(600.f);
 	// Damage is a meta attribute — never init, never replicate
 }
 
@@ -24,6 +26,8 @@ void UMAAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME_CONDITION_NOTIFY(UMAAttributeSet, Stamina, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UMAAttributeSet, AttackPower, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UMAAttributeSet, Armor, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMAAttributeSet, MaxStamina, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMAAttributeSet, MoveSpeed, COND_None, REPNOTIFY_Always);
 	// Damage is meta — not replicated
 }
 
@@ -51,8 +55,7 @@ void UMAAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 	}
 	else if (Data.EvaluatedData.Attribute == GetStaminaAttribute())
 	{
-		// Hardcoded upper bound 100 — promote to a MaxStamina attribute later if needed
-		SetStamina(FMath::Clamp(GetStamina(), 0.f, 100.f));
+		SetStamina(FMath::Clamp(GetStamina(), 0.f, GetMaxStamina()));
 	}
 }
 
@@ -97,4 +100,14 @@ void UMAAttributeSet::OnRep_AttackPower(const FGameplayAttributeData& OldAttackP
 void UMAAttributeSet::OnRep_Armor(const FGameplayAttributeData& OldArmor)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UMAAttributeSet, Armor, OldArmor);
+}
+
+void UMAAttributeSet::OnRep_MaxStamina(const FGameplayAttributeData& OldMaxStamina)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMAAttributeSet, MaxStamina, OldMaxStamina);
+}
+
+void UMAAttributeSet::OnRep_MoveSpeed(const FGameplayAttributeData& OldMoveSpeed)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMAAttributeSet, MoveSpeed, OldMoveSpeed);
 }

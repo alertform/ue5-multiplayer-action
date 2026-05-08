@@ -51,6 +51,16 @@ public:
 	FGameplayAttributeData Armor;
 	ATTRIBUTE_ACCESSORS(UMAAttributeSet, Armor)
 
+	// MaxStamina — upper clamp for Stamina (replaces hardcoded 100 in PostExecute)
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes", ReplicatedUsing = OnRep_MaxStamina)
+	FGameplayAttributeData MaxStamina;
+	ATTRIBUTE_ACCESSORS(UMAAttributeSet, MaxStamina)
+
+	// MoveSpeed — drives CharacterMovement.MaxWalkSpeed via Character-side listener
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes", ReplicatedUsing = OnRep_MoveSpeed)
+	FGameplayAttributeData MoveSpeed;
+	ATTRIBUTE_ACCESSORS(UMAAttributeSet, MoveSpeed)
+
 	// Damage — META attribute: not replicated, not init, only used as a transient bucket
 	// during a damage GE execution. AS PostGameplayEffectExecute routes Damage to Health.
 	UPROPERTY(BlueprintReadOnly, Category = "Attributes")
@@ -72,4 +82,10 @@ protected:
 
 	UFUNCTION()
 	void OnRep_Armor(const FGameplayAttributeData& OldArmor);
+
+	UFUNCTION()
+	void OnRep_MaxStamina(const FGameplayAttributeData& OldMaxStamina);
+
+	UFUNCTION()
+	void OnRep_MoveSpeed(const FGameplayAttributeData& OldMoveSpeed);
 };

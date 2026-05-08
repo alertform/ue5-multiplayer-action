@@ -19,4 +19,10 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Movement_Sprint, "Ability.Movement.Sprint",
 		"Activation + asset tag for UGA_Sprint; GA_MeleeAttack lists this in CancelAbilitiesWithTag to interrupt sprint on attack");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Movement_Dodge, "Ability.Movement.Dodge",
+		"Asset tag for UGA_Dodge");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dodging, "State.Dodging",
+		"ActivationOwnedTags during dodge — BP_GE_Damage ApplicationTagRequirements.IgnoreTags includes this to grant i-frame");
 }

@@ -57,6 +57,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SprintAction;
 
+	/** Dodge Input Action — Started fires once per press */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* DodgeAction;
+
 public:
 	AMultiPlayerActionCharacter();
 
@@ -94,6 +98,11 @@ protected:
 	/** Grant default abilities to the ASC (server only) */
 	void GiveDefaultAbilities();
 
+	/** Bind ASC delegate so MoveSpeed attribute changes drive CharacterMovement.MaxWalkSpeed */
+	void BindMoveSpeedDelegate();
+	bool bMoveSpeedBound = false;
+	void HandleMoveSpeedChange(const struct FOnAttributeChangeData& Data);
+
 
 protected:
 
@@ -108,6 +117,8 @@ protected:
 
 	void OnSprintPressed();
 	void OnSprintReleased();
+
+	void OnDodgeInput();
 			
 
 protected:

@@ -56,8 +56,10 @@ void AMAPlayerController::Respawn()
 		if (UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent())
 		{
 			ASC->RemoveLooseGameplayTag(MAGameplayTags::State_Dead);
-			ASC->SetNumericAttributeBase(UMAAttributeSet::GetHealthAttribute(), 100.f);
-			ASC->SetNumericAttributeBase(UMAAttributeSet::GetStaminaAttribute(), 100.f);
+			ASC->SetNumericAttributeBase(UMAAttributeSet::GetHealthAttribute(),
+				ASC->GetNumericAttribute(UMAAttributeSet::GetMaxHealthAttribute()));
+			ASC->SetNumericAttributeBase(UMAAttributeSet::GetStaminaAttribute(),
+				ASC->GetNumericAttribute(UMAAttributeSet::GetMaxStaminaAttribute()));
 		}
 	}
 

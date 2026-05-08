@@ -2,8 +2,6 @@
 #include "AbilitySystem/MAGameplayTags.h"
 #include "AbilitySystem/MAAttributeSet.h"
 #include "AbilitySystemComponent.h"
-#include "GameFramework/Character.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
 
@@ -33,14 +31,11 @@ void UGA_Sprint::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	// Boost movement speed; remember original for restore in EndAbility
-	if (ACharacter* Char = Cast<ACharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr))
+	// Boost via attribute — Character listens to MoveSpeed delegate and updates MaxWalkSpeed
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
 	{
-		if (UCharacterMovementComponent* Move = Char->GetCharacterMovement())
-		{
-			OriginalWalkSpeed = Move->MaxWalkSpeed;
-			Move->MaxWalkSpeed = SprintSpeed;
-		}
+		OriginalWalkSpeed = ASC->GetNumericAttribute(UMAAttributeSet::GetMoveSpeedAttribute());
+		ASC->SetNumericAttributeBase(UMAAttributeSet::GetMoveSpeedAttribute(), SprintSpeed);
 	}
 
 	if (UWorld* World = GetWorld())
@@ -81,12 +76,9 @@ void UGA_Sprint::EndAbility(const FGameplayAbilitySpecHandle Handle,
 		World->GetTimerManager().ClearTimer(DrainTimer);
 	}
 
-	if (ACharacter* Char = Cast<ACharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr))
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
 	{
-		if (UCharacterMovementComponent* Move = Char->GetCharacterMovement())
-		{
-			Move->MaxWalkSpeed = OriginalWalkSpeed;
-		}
+		ASC->SetNumericAttributeBase(UMAAttributeSet::GetMoveSpeedAttribute(), OriginalWalkSpeed);
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

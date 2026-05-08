@@ -40,6 +40,7 @@ void AMultiPlayerActionCharacter::PossessedBy(AController* NewController)
 		AttributeSet = PS->GetAttributeSet();
 		PS->GetAbilitySystemComponent()->InitAbilityActorInfo(PS, this);
 		GiveDefaultAbilities();
+		BindMoveSpeedDelegate();
 	}
 }
 
@@ -81,6 +82,33 @@ void AMultiPlayerActionCharacter::OnRep_PlayerState()
 		AbilitySystemComponent = Cast<UMAAbilitySystemComponent>(PS->GetAbilitySystemComponent());
 		AttributeSet = PS->GetAttributeSet();
 		PS->GetAbilitySystemComponent()->InitAbilityActorInfo(PS, this);
+		BindMoveSpeedDelegate();
+	}
+}
+
+void AMultiPlayerActionCharacter::BindMoveSpeedDelegate()
+{
+	if (bMoveSpeedBound || !AbilitySystemComponent || !AttributeSet)
+	{
+		return;
+	}
+	bMoveSpeedBound = true;
+
+	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UMAAttributeSet::GetMoveSpeedAttribute())
+		.AddUObject(this, &AMultiPlayerActionCharacter::HandleMoveSpeedChange);
+
+	// Seed: apply current MoveSpeed to CharacterMovement immediately (replication may lag)
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->MaxWalkSpeed = AttributeSet->GetMoveSpeed();
+	}
+}
+
+void AMultiPlayerActionCharacter::HandleMoveSpeedChange(const FOnAttributeChangeData& Data)
+{
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->MaxWalkSpeed = Data.NewValue;
 	}
 }
 
@@ -169,6 +197,12 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 			EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnSprintPressed);
 			EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AMultiPlayerActionCharacter::OnSprintReleased);
 		}
+
+		// Dodge — single press triggers UGA_Dodge with brief i-frame
+		if (DodgeAction)
+		{
+			EnhancedInputComponent->BindAction(DodgeAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnDodgeInput);
+		}
 	}
 	else
 	{
@@ -239,6 +273,16 @@ void AMultiPlayerActionCharacter::OnSprintReleased()
 		FGameplayTagContainer AbilityTags;
 		AbilityTags.AddTag(MAGameplayTags::Ability_Movement_Sprint);
 		AbilitySystemComponent->CancelAbilities(&AbilityTags);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnDodgeInput()
+{
+	if (AbilitySystemComponent)
+	{
+		FGameplayTagContainer AbilityTags;
+		AbilityTags.AddTag(MAGameplayTags::Ability_Movement_Dodge);
+		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
 	}
 }
 
