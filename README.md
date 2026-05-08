@@ -157,44 +157,12 @@ PIE: open `Content/ThirdPerson/Maps/ThirdPersonMap`, set Number of Players ≥ 2
 
 ---
 
-## Status
-
-Stage 1-2 (4/19 - 5/5): minimal melee combat loop end-to-end. ✅
-Stage 2.5 (5/7): Lyra-style HUD architecture, NPC ASC pattern, Death/Respawn, GameplayCue, Stamina regen. ✅
-Stage 3 (5/8): ExecutionCalculation damage formula, AI BehaviorTree, Sprint with multi-ability cancel. ✅
-
-| Component | Status |
-|---|---|
-| Project scaffold on UE 5.5 with GAS plugin | ✅ |
-| Third-person Character + Enhanced Input | ✅ |
-| AttributeSet (Health/MaxHealth/Stamina/AttackPower/Armor + Damage meta) | ✅ |
-| PlayerState-owned ASC, init on both server + client | ✅ |
-| Native gameplay tags (`UE_DEFINE_GAMEPLAY_TAG_COMMENT`) | ✅ |
-| Melee `GameplayAbility` with montage + sphere trace + damage GE | ✅ |
-| `GameplayEffectExecutionCalculation` damage formula | ✅ |
-| `Damage` meta-attribute routing in `PostGameplayEffectExecute` | ✅ |
-| `GameplayCue` hit FX with `FHitResult` location/normal | ✅ |
-| Periodic Stamina regen GE with `OngoingTagRequirements` suppression | ✅ |
-| Sprint ability (hold-to-activate, drain, auto-end, multi-ability cancel) | ✅ |
-| Lyra-style HUD via abstract `UMAUserWidget` base self-binding to ASC | ✅ |
-| NPC ASC (Pawn-owned, Minimal replication) + floating health bar | ✅ |
-| Death + Respawn loop with `NetMulticast` ragdoll + `UnPossess` fix | ✅ |
-| `BehaviorTree` AI sharing player's `UGA_MeleeAttack` via `TryActivateAbilityByTag` | ✅ |
-| `AIController` + custom `BTService` + custom `BTTask` | ✅ |
-| Multiplayer PIE listen-server end-to-end verified | ✅ |
-| Online session / lobby (`OnlineSubsystem`) | ⏳ future |
-| Damage numbers, hit-react montages, dodge i-frames | ⏳ future |
-
----
-
 ## Notes for reviewers
 
 - Code leans toward **C++ first, Blueprint composition only** — engine-level work, not BP scripting.
 - Architecture decisions follow Lyra conventions where applicable (HUD widget binding, NPC ASC ownership, `Damage` meta-attribute routing, `BehaviorTree` + GAS integration, replication modes).
 - Multiplayer correctness validated in PIE listen-server with 2 players: server-authoritative damage, attribute replication, ragdoll Multicast, owning-client HUD binding.
 - Dev gotchas captured in commit messages — UE 5.5 deprecations (`SetAssetTags`, `SetNetUpdateFrequency`, GE Components system), the `RestartPlayer` teleport-existing trap, `NetMulticast` for component state, `bWarningsAsErrors` shadow-name pitfalls.
-
-`CLAUDE.md` in the repo root has more in-depth architecture notes.
 
 ---
 

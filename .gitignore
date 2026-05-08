@@ -26,3 +26,6 @@ Saved/
 !Content/*.uasset
 !Content/*.umap
 !*.uproject
+
+# Local AI assistant notes — not for public repo
+CLAUDE.md
