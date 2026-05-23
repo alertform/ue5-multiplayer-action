@@ -16,10 +16,11 @@ public class MultiPlayerAction : ModuleRules
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			// AI
 			"AIModule",
-			// Networking
-			"NetCore", "OnlineSubsystem",
+			// Networking + Session
+			"NetCore", "OnlineSubsystem", "OnlineSubsystemUtils",
 			// UI
-			"UMG", "Slate", "SlateCore"
+			"UMG", "Slate", "SlateCore",
+			"ModelViewViewModel", "FieldNotification"
 		});
 	}
 }
