@@ -22,6 +22,7 @@ class MULTIPLAYERACTION_API UMAMainMenuWidget : public UUserWidget
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 
 	UPROPERTY(meta = (BindWidgetOptional)) TObjectPtr<UButton> HostButton;
 	UPROPERTY(meta = (BindWidgetOptional)) TObjectPtr<UButton> RefreshButton;

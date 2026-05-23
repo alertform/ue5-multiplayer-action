@@ -22,6 +22,10 @@ public:
 	/** Idempotent: caches subsystem + PC, binds subsystem delegates once. */
 	void Initialize(UMASessionSubsystem* InSubsystem, APlayerController* InOwningPC);
 
+	/** Unbinds the subsystem delegates. Called from the View's NativeDestruct so a
+	 *  destroyed menu (e.g. after travel) leaves no dead bindings on the long-lived subsystem. */
+	void Deinitialize();
+
 	UFUNCTION(BlueprintCallable, Category = "Menu") void Host();
 	UFUNCTION(BlueprintCallable, Category = "Menu") void Refresh();
 	UFUNCTION(BlueprintCallable, Category = "Menu") void Join(int32 EntryIndex);
@@ -38,8 +42,8 @@ public:
 	void SetStatusText(const FText& In) { UE_MVVM_SET_PROPERTY_VALUE(StatusText, In); }
 	int32 GetMaxPlayers() const { return MaxPlayers; }
 	void SetMaxPlayers(int32 In) { UE_MVVM_SET_PROPERTY_VALUE(MaxPlayers, FMath::Clamp(In, 1, 8)); }
-	FString GetPlayerName() const { return PlayerName; }
-	void SetPlayerName(const FString& In) { UE_MVVM_SET_PROPERTY_VALUE(PlayerName, In); }
+	FText GetPlayerName() const { return PlayerName; }
+	void SetPlayerName(const FText& In) { UE_MVVM_SET_PROPERTY_VALUE(PlayerName, In); }
 	bool HasSessions() const { return bHasSessions; }
 	void SetHasSessions(bool In) { UE_MVVM_SET_PROPERTY_VALUE(bHasSessions, In); }
 
@@ -58,7 +62,7 @@ private:
 	int32 MaxPlayers = 4;
 
 	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter = GetPlayerName, Setter = SetPlayerName, meta = (AllowPrivateAccess = "true"))
-	FString PlayerName;
+	FText PlayerName;
 
 	UPROPERTY(BlueprintReadOnly, FieldNotify, Getter = HasSessions, Setter = SetHasSessions, meta = (AllowPrivateAccess = "true"))
 	bool bHasSessions = false;

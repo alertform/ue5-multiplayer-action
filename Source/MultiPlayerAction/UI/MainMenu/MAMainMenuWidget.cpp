@@ -50,6 +50,15 @@ void UMAMainMenuWidget::NativeConstruct()
 	HandleSessionsChanged();
 }
 
+void UMAMainMenuWidget::NativeDestruct()
+{
+	if (ViewModel)
+	{
+		ViewModel->Deinitialize();
+	}
+	Super::NativeDestruct();
+}
+
 void UMAMainMenuWidget::HandleHostClicked()    { if (ViewModel) { ViewModel->Host(); } }
 void UMAMainMenuWidget::HandleRefreshClicked() { if (ViewModel) { ViewModel->Refresh(); } }
 void UMAMainMenuWidget::HandleQuitClicked()    { if (ViewModel) { ViewModel->Quit(); } }

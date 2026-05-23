@@ -218,6 +218,8 @@ FString UMASessionSubsystem::SanitizePlayerName(const FString& In)
 	Out.ReplaceInline(TEXT("?"), TEXT(""));
 	Out.ReplaceInline(TEXT(":"), TEXT(""));
 	Out.ReplaceInline(TEXT("#"), TEXT(""));
+	Out.ReplaceInline(TEXT("="), TEXT(""));
+	Out.ReplaceInline(TEXT("&"), TEXT(""));
 	return Out.Left(32);
 }
 

@@ -4,19 +4,36 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/KismetSystemLibrary.h"
 
+namespace
+{
+	/** Gameplay map the host travels into (and clients follow via session join). */
+	const TCHAR* const GameplayMapPath = TEXT("/Game/Maps/ThirdPersonMap");
+}
+
 void UMAMainMenuViewModel::Initialize(UMASessionSubsystem* InSubsystem, APlayerController* InOwningPC)
 {
-	OwningPC = InOwningPC;
-	Subsystem = InSubsystem;
-	if (bInitialized || !Subsystem)
+	OwningPC = InOwningPC; // refresh the owning PC on every construct
+	if (bInitialized || !InSubsystem)
 	{
 		return;
 	}
 
+	Subsystem = InSubsystem;
 	Subsystem->OnHostSessionComplete.AddDynamic(this, &UMAMainMenuViewModel::HandleHostComplete);
 	Subsystem->OnFindSessionsComplete.AddDynamic(this, &UMAMainMenuViewModel::HandleFindComplete);
 	Subsystem->OnJoinSessionComplete.AddDynamic(this, &UMAMainMenuViewModel::HandleJoinComplete);
 	bInitialized = true;
+}
+
+void UMAMainMenuViewModel::Deinitialize()
+{
+	if (Subsystem)
+	{
+		Subsystem->OnHostSessionComplete.RemoveDynamic(this, &UMAMainMenuViewModel::HandleHostComplete);
+		Subsystem->OnFindSessionsComplete.RemoveDynamic(this, &UMAMainMenuViewModel::HandleFindComplete);
+		Subsystem->OnJoinSessionComplete.RemoveDynamic(this, &UMAMainMenuViewModel::HandleJoinComplete);
+	}
+	bInitialized = false;
 }
 
 void UMAMainMenuViewModel::Host()
@@ -24,7 +41,7 @@ void UMAMainMenuViewModel::Host()
 	if (!Subsystem) { return; }
 	SetIsBusy(true);
 	SetStatusText(FText::FromString(TEXT("Creating session...")));
-	Subsystem->HostSession(MaxPlayers, TEXT("/Game/Maps/ThirdPersonMap"), PlayerName);
+	Subsystem->HostSession(MaxPlayers, GameplayMapPath, PlayerName.ToString());
 }
 
 void UMAMainMenuViewModel::Refresh()
@@ -40,7 +57,7 @@ void UMAMainMenuViewModel::Join(int32 EntryIndex)
 	if (!Subsystem) { return; }
 	SetIsBusy(true);
 	SetStatusText(FText::FromString(TEXT("Joining...")));
-	Subsystem->SetLocalPlayerName(PlayerName);
+	Subsystem->SetLocalPlayerName(PlayerName.ToString());
 	Subsystem->JoinSessionByIndex(EntryIndex);
 }
 
