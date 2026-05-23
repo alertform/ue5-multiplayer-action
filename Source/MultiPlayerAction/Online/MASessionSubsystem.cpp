@@ -1,0 +1,229 @@
+#include "Online/MASessionSubsystem.h"
+#include "OnlineSubsystem.h"
+#include "OnlineSubsystemUtils.h"
+#include "Online/OnlineSessionNames.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
+
+UMASessionSubsystem::UMASessionSubsystem() = default;
+
+IOnlineSessionPtr UMASessionSubsystem::GetSessionInterface() const
+{
+	IOnlineSubsystem* OSS = Online::GetSubsystem(GetWorld());
+	return OSS ? OSS->GetSessionInterface() : nullptr;
+}
+
+// ---------- Host ----------
+
+void UMASessionSubsystem::HostSession(int32 NumPublicConnections, const FString& MapName, const FString& PlayerName)
+{
+	if (!PlayerName.IsEmpty())
+	{
+		SetLocalPlayerName(PlayerName);
+	}
+
+	IOnlineSessionPtr Sessions = GetSessionInterface();
+	if (!Sessions.IsValid())
+	{
+		OnHostSessionComplete.Broadcast(false);
+		return;
+	}
+
+	// If a session already exists, destroy it first (e.g. retry after a failed attempt)
+	if (Sessions->GetNamedSession(SessionName))
+	{
+		Sessions->DestroySession(SessionName);
+	}
+
+	PendingTravelURL = MapName + TEXT("?listen") + BuildNameOption();
+
+	FOnlineSessionSettings Settings;
+	Settings.NumPublicConnections = FMath::Max(1, NumPublicConnections);
+	Settings.bShouldAdvertise = true;
+	Settings.bAllowJoinInProgress = true;
+	Settings.bIsLANMatch = true;            // NULL OSS → LAN broadcast
+	Settings.bUsesPresence = false;          // not using Steam/EOS presence
+	Settings.bAllowJoinViaPresence = false;
+	Settings.bAllowInvites = false;
+	Settings.bUseLobbiesIfAvailable = false; // NULL OSS doesn't have Steam-style lobbies
+
+	CreateSessionHandle = Sessions->AddOnCreateSessionCompleteDelegate_Handle(
+		FOnCreateSessionCompleteDelegate::CreateUObject(this, &UMASessionSubsystem::HandleCreateSessionComplete));
+
+	const ULocalPlayer* LP = GetGameInstance()->GetFirstGamePlayer();
+	if (!LP || !Sessions->CreateSession(*LP->GetPreferredUniqueNetId(), SessionName, Settings))
+	{
+		Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionHandle);
+		OnHostSessionComplete.Broadcast(false);
+	}
+}
+
+void UMASessionSubsystem::HandleCreateSessionComplete(FName InSessionName, bool bWasSuccessful)
+{
+	if (IOnlineSessionPtr Sessions = GetSessionInterface())
+	{
+		Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionHandle);
+	}
+
+	OnHostSessionComplete.Broadcast(bWasSuccessful);
+
+	if (bWasSuccessful && !PendingTravelURL.IsEmpty())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->ServerTravel(PendingTravelURL);
+		}
+	}
+}
+
+// ---------- Find ----------
+
+void UMASessionSubsystem::FindSessions(int32 MaxSearchResults)
+{
+	IOnlineSessionPtr Sessions = GetSessionInterface();
+	if (!Sessions.IsValid())
+	{
+		OnFindSessionsComplete.Broadcast(false, {});
+		return;
+	}
+
+	SearchSettings = MakeShared<FOnlineSessionSearch>();
+	SearchSettings->MaxSearchResults = FMath::Max(1, MaxSearchResults);
+	SearchSettings->bIsLanQuery = true;
+	SearchSettings->QuerySettings.Set(SEARCH_PRESENCE, false, EOnlineComparisonOp::Equals);
+
+	FindSessionsHandle = Sessions->AddOnFindSessionsCompleteDelegate_Handle(
+		FOnFindSessionsCompleteDelegate::CreateUObject(this, &UMASessionSubsystem::HandleFindSessionsComplete));
+
+	const ULocalPlayer* LP = GetGameInstance()->GetFirstGamePlayer();
+	if (!LP || !Sessions->FindSessions(*LP->GetPreferredUniqueNetId(), SearchSettings.ToSharedRef()))
+	{
+		Sessions->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsHandle);
+		OnFindSessionsComplete.Broadcast(false, {});
+	}
+}
+
+void UMASessionSubsystem::HandleFindSessionsComplete(bool bWasSuccessful)
+{
+	if (IOnlineSessionPtr Sessions = GetSessionInterface())
+	{
+		Sessions->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsHandle);
+	}
+
+	TArray<FMASessionInfo> Snapshots;
+	if (bWasSuccessful && SearchSettings.IsValid())
+	{
+		for (const FOnlineSessionSearchResult& R : SearchSettings->SearchResults)
+		{
+			FMASessionInfo Info;
+			Info.OwningUserName = R.Session.OwningUserName;
+			Info.PingMs = R.PingInMs;
+			Info.NumOpenConnections = R.Session.NumOpenPublicConnections;
+			Info.NumPublicConnections = R.Session.SessionSettings.NumPublicConnections;
+			Snapshots.Add(Info);
+		}
+	}
+
+	OnFindSessionsComplete.Broadcast(bWasSuccessful, Snapshots);
+}
+
+// ---------- Join ----------
+
+void UMASessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
+{
+	IOnlineSessionPtr Sessions = GetSessionInterface();
+	if (!Sessions.IsValid() || !SearchSettings.IsValid() ||
+		!SearchSettings->SearchResults.IsValidIndex(SessionIndex))
+	{
+		OnJoinSessionComplete.Broadcast(false);
+		return;
+	}
+
+	JoinSessionHandle = Sessions->AddOnJoinSessionCompleteDelegate_Handle(
+		FOnJoinSessionCompleteDelegate::CreateUObject(this, &UMASessionSubsystem::HandleJoinSessionComplete));
+
+	const ULocalPlayer* LP = GetGameInstance()->GetFirstGamePlayer();
+	if (!LP || !Sessions->JoinSession(*LP->GetPreferredUniqueNetId(), SessionName,
+		SearchSettings->SearchResults[SessionIndex]))
+	{
+		Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionHandle);
+		OnJoinSessionComplete.Broadcast(false);
+	}
+}
+
+void UMASessionSubsystem::HandleJoinSessionComplete(FName InSessionName, EOnJoinSessionCompleteResult::Type Result)
+{
+	IOnlineSessionPtr Sessions = GetSessionInterface();
+	if (Sessions.IsValid())
+	{
+		Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionHandle);
+	}
+
+	const bool bSuccess = (Result == EOnJoinSessionCompleteResult::Success);
+	OnJoinSessionComplete.Broadcast(bSuccess);
+
+	if (bSuccess && Sessions.IsValid())
+	{
+		FString TravelURL;
+		if (Sessions->GetResolvedConnectString(SessionName, TravelURL))
+		{
+			TravelURL += BuildNameOption();
+			if (APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController())
+			{
+				PC->ClientTravel(TravelURL, TRAVEL_Absolute);
+			}
+		}
+	}
+}
+
+// ---------- Destroy ----------
+
+void UMASessionSubsystem::DestroyCurrentSession()
+{
+	IOnlineSessionPtr Sessions = GetSessionInterface();
+	if (!Sessions.IsValid() || !Sessions->GetNamedSession(SessionName))
+	{
+		OnDestroySessionComplete.Broadcast(true); // already gone
+		return;
+	}
+
+	DestroySessionHandle = Sessions->AddOnDestroySessionCompleteDelegate_Handle(
+		FOnDestroySessionCompleteDelegate::CreateUObject(this, &UMASessionSubsystem::HandleDestroySessionComplete));
+
+	if (!Sessions->DestroySession(SessionName))
+	{
+		Sessions->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionHandle);
+		OnDestroySessionComplete.Broadcast(false);
+	}
+}
+
+void UMASessionSubsystem::HandleDestroySessionComplete(FName InSessionName, bool bWasSuccessful)
+{
+	if (IOnlineSessionPtr Sessions = GetSessionInterface())
+	{
+		Sessions->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionHandle);
+	}
+	OnDestroySessionComplete.Broadcast(bWasSuccessful);
+}
+
+void UMASessionSubsystem::SetLocalPlayerName(const FString& InPlayerName)
+{
+	DesiredPlayerName = SanitizePlayerName(InPlayerName);
+}
+
+FString UMASessionSubsystem::SanitizePlayerName(const FString& In)
+{
+	FString Out = In.TrimStartAndEnd();
+	Out.ReplaceInline(TEXT(" "), TEXT("_"));
+	Out.ReplaceInline(TEXT("?"), TEXT(""));
+	Out.ReplaceInline(TEXT(":"), TEXT(""));
+	Out.ReplaceInline(TEXT("#"), TEXT(""));
+	return Out.Left(32);
+}
+
+FString UMASessionSubsystem::BuildNameOption() const
+{
+	return DesiredPlayerName.IsEmpty()
+		? FString()
+		: FString::Printf(TEXT("?Name=%s"), *DesiredPlayerName);
+}
