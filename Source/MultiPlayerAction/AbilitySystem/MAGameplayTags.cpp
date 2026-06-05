@@ -25,4 +25,16 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dodging, "State.Dodging",
 		"ActivationOwnedTags during dodge — BP_GE_Damage ApplicationTagRequirements.IgnoreTags includes this to grant i-frame");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Ranged_Fireball, "Ability.Ranged.Fireball",
+		"Activation + asset tag for UGA_Fireball — TryActivateAbilitiesByTag matches against this");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Cooldown_Fireball, "Ability.Cooldown.Fireball",
+		"Cooldown tag granted by BP_GE_Cooldown_Fireball — blocks UGA_Fireball while present");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_SpawnProjectile, "Event.Montage.SpawnProjectile",
+		"GameplayEvent sent from AnimNotify on AM_FireballCast's release frame — server spawns the projectile here");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Fireball_Explosion, "GameplayCue.Fireball.Explosion",
+		"Explosion FX cue executed from AMAProjectile::Explode with impact location — drives BP_GCN_FireballExplosion");
 }

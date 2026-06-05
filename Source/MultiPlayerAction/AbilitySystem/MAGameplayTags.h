@@ -30,4 +30,10 @@ namespace MAGameplayTags
 	// Dodge ability + dodge invincibility frame state tag.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Movement_Dodge);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dodging);
+
+	// Fireball ranged ability family — activation tag, cooldown, montage release event, explosion cue.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Ranged_Fireball);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Fireball);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_SpawnProjectile);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Fireball_Explosion);
 }
