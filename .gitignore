@@ -29,3 +29,14 @@ Saved/
 
 # Local AI assistant notes — not for public repo
 CLAUDE.md
+.claude/
+.omc/
+
+# IDE / local tooling
+.idea/
+.vsconfig
+Plugins/Developer/
+
+# Local-only asset packs — marketplace content must not be redistributed in a public repo
+Content/MageBundleSamples/
+Content/StarterContent/
