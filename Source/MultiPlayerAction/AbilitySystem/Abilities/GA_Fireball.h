@@ -26,6 +26,11 @@ public:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility, bool bWasCancelled) override;
+
 protected:
 	/** Cast montage — its release frame carries AN_SendGameplayEvent(Event.Montage.SpawnProjectile) */
 	UPROPERTY(EditDefaultsOnly, Category = "Fireball")
