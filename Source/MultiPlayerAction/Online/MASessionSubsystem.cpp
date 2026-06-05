@@ -1,7 +1,6 @@
 #include "Online/MASessionSubsystem.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
-#include "Online/OnlineSessionNames.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 
@@ -163,7 +162,6 @@ void UMASessionSubsystem::FindSessions(int32 MaxSearchResults)
 	SearchSettings = MakeShared<FOnlineSessionSearch>();
 	SearchSettings->MaxSearchResults = FMath::Max(1, MaxSearchResults);
 	SearchSettings->bIsLanQuery = true;
-	SearchSettings->QuerySettings.Set(SEARCH_PRESENCE, false, EOnlineComparisonOp::Equals);
 
 	FindSessionsHandle = Sessions->AddOnFindSessionsCompleteDelegate_Handle(
 		FOnFindSessionsCompleteDelegate::CreateUObject(this, &UMASessionSubsystem::HandleFindSessionsComplete));
