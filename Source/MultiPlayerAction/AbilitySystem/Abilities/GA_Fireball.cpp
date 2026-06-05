@@ -116,7 +116,10 @@ void UGA_Fireball::SpawnProjectile(const FGameplayAbilityActorInfo* ActorInfo)
 	}
 
 	// BaseAimRotation: ControlRotation for players, focal rotation for AI — one code path serves both.
-	const FRotator SpawnRotation = AvatarPawn ? AvatarPawn->GetBaseAimRotation() : Avatar->GetActorRotation();
+	// Yaw only: the third-person camera carries a slight downward pitch, which would slam the bolt
+	// into the ground a few meters out. No crosshair in this game — horizontal flight reads best.
+	const FRotator SpawnRotation(0.f,
+		AvatarPawn ? AvatarPawn->GetBaseAimRotation().Yaw : Avatar->GetActorRotation().Yaw, 0.f);
 
 	// Snapshot the damage spec NOW — ExecCalc captures source AttackPower at spec-creation time,
 	// so the fireball lands with cast-time stats even if the caster dies mid-flight.
