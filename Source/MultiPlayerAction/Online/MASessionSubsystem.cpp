@@ -22,6 +22,18 @@ void UMASessionSubsystem::HostSession(int32 NumPublicConnections, const FString&
 		SetLocalPlayerName(PlayerName);
 	}
 
+	// Hosting requires authority over the current world: a client connected to another
+	// server cannot ServerTravel (the engine ensures and drops the connection). Hit when
+	// PIE 'Listen Server' mode pre-connects every window to one menu world — menu-flow
+	// testing belongs in 'Play Standalone'.
+	if (const UWorld* World = GetWorld(); World && World->GetNetMode() == NM_Client)
+	{
+		UE_LOG(LogNet, Warning,
+			TEXT("UMASessionSubsystem::HostSession refused: this world is a connected client and cannot ServerTravel."));
+		OnHostSessionComplete.Broadcast(false);
+		return;
+	}
+
 	IOnlineSessionPtr Sessions = GetSessionInterface();
 	if (!Sessions.IsValid())
 	{
