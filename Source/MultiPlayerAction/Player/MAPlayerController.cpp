@@ -15,7 +15,7 @@ AMAPlayerController::AMAPlayerController()
 	// Bind WBP_HUD asset directly here so the C++ class is self-sufficient
 	// (no BP_MAPlayerController child needed; matches the BP_ThirdPersonCharacter
 	// ClassFinder pattern in MultiPlayerActionGameMode.cpp)
-	static ConstructorHelpers::FClassFinder<UMAUserWidget> HUDWidgetBPClass(TEXT("/Game/UI/WBP_HUD"));
+	static ConstructorHelpers::FClassFinder<UMAUserWidget> HUDWidgetBPClass(TEXT("/Game/Blueprints/UI/WBP_HUD"));
 	if (HUDWidgetBPClass.Succeeded())
 	{
 		HUDWidgetClass = HUDWidgetBPClass.Class;
@@ -25,6 +25,16 @@ AMAPlayerController::AMAPlayerController()
 void AMAPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (IsLocalController())
+	{
+		// The front-end menu leaves the viewport in UIOnly input mode; map travel does NOT
+		// reset it — reclaim game input explicitly or all keyboard input dies in-world.
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+		SetShowMouseCursor(false);
+	}
+
 	EnsureHUDInitialized();
 }
 
