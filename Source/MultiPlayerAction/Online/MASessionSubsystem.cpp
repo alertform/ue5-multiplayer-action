@@ -34,6 +34,14 @@ void UMASessionSubsystem::HostSession(int32 NumPublicConnections, const FString&
 		return;
 	}
 
+	// Re-entrancy guard: a stale-session destroy is already in flight (rapid double click) —
+	// a second request would orphan StaleDestroyHandle and double-fire the chain (gate review).
+	if (PendingHostConnections != INDEX_NONE || PendingJoinIndex != INDEX_NONE)
+	{
+		OnHostSessionComplete.Broadcast(false);
+		return;
+	}
+
 	IOnlineSessionPtr Sessions = GetSessionInterface();
 	if (!Sessions.IsValid())
 	{
@@ -196,6 +204,13 @@ void UMASessionSubsystem::HandleFindSessionsComplete(bool bWasSuccessful)
 
 void UMASessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 {
+	// Re-entrancy guard — see HostSession.
+	if (PendingHostConnections != INDEX_NONE || PendingJoinIndex != INDEX_NONE)
+	{
+		OnJoinSessionComplete.Broadcast(false);
+		return;
+	}
+
 	IOnlineSessionPtr Sessions = GetSessionInterface();
 	if (!Sessions.IsValid() || !SearchSettings.IsValid() ||
 		!SearchSettings->SearchResults.IsValidIndex(SessionIndex))
