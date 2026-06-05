@@ -8,7 +8,8 @@ Lyra-style PvE melee combat demo built on Unreal Engine 5.5 — full **Gameplay 
 
 | Area | What's in |
 |---|---|
-| **GAS 5 pillars** | `GameplayAbility` (LocalPredicted) · `GameplayEffect` (Damage Execution / Cooldown / Stamina Cost / Periodic Stamina Regen) · `AttributeSet` (Health/MaxHealth/Stamina/AttackPower/Armor + Damage meta) · `GameplayCue` (`Static` notify w/ `FHitResult` location/normal) · `PredictionKey` |
+| **GAS 5 pillars** | `GameplayAbility` (LocalPredicted ×4: Melee / Sprint / Dodge / Fireball) · `GameplayEffect` (Damage Execution / Cooldown / Stamina Cost / Periodic Stamina Regen) · `AttributeSet` (Health/MaxHealth/Stamina/AttackPower/Armor + Damage meta) · `GameplayCue` (`Static` notify w/ `FHitResult` location/normal + data-driven C++ burst cue base) · `PredictionKey` |
+| **Projectile netcode** | Lyra/GASShooter-style ranged AoE: predicted cast montage (instant client feedback) + **server-only spawn** of a replicated `AMAProjectile` carrying a damage spec **snapshotted at cast time** — the fireball lands with cast-time stats even if the caster dies mid-flight. AoE overlap applies the same ExecCalc to every ASC in radius; explosion FX replicate via GameplayCue. |
 | **Damage formula** | `UGameplayEffectExecutionCalculation` capturing source `AttackPower` (snapshot) + target `Armor` (live), output to `Damage` meta-attribute, AS routes to `Health`. Lyra `ULyraDamageExecution` pattern. |
 | **HUD architecture** | `UMAUserWidget` abstract C++ base self-binds to `ASC->GetGameplayAttributeValueChangeDelegate`. BP children handle visuals only. Same widget base reused for player HUD + enemy floating health bar. |
 | **AI** | `BehaviorTree` + custom `UBTService_UpdateTargetInfo` (per-tick player tracking) + custom `UBTTask_TryActivateAbilityByTag` (BT node → `ASC.TryActivateAbilitiesByTag`). AI calls the **same `UGA_MeleeAttack` C++ class** the player drives via Enhanced Input. |
@@ -70,6 +71,28 @@ Enhanced Input → ASC.TryActivateAbilitiesByTag(Ability.Melee.Attack)
                     Respawn: UnPossess + GameMode.RestartPlayer → fresh pawn at PlayerStart
 ```
 
+### Fireball flow (ranged AoE — predicted cast, authoritative projectile)
+
+```
+Player input (Q) → ASC.TryActivateAbilitiesByTag(Ability.Ranged.Fireball)
+     ↓
+UGA_Fireball::ActivateAbility (LocalPredicted — cast starts INSTANTLY on the owning client)
+     ↓
+CommitAbility (Stamina -20 + 3s cooldown) · snap to aim yaw · root caster for the cast
+     ↓
+PlayMontageAndWait(AM_FireballCast) + WaitGameplayEvent(Event.Montage.SpawnProjectile)
+     ↓ (release-frame AnimNotify, ~1.65s — windup masks the projectile's replication latency)
+SERVER ONLY: snapshot damage spec (source AttackPower captured NOW)
+     ↓
+SpawnActorDeferred<AMAProjectile> (bReplicates + movement replication) → InitProjectile(spec, radius)
+     ↓
+Impact (server): SphereOverlap(ECC_Pawn, r=300) — instigator excluded
+     ↓
+Apply snapshotted spec to every ASC in radius (same MADamageExecutionCalculation as melee)
+     ↓
+Source ASC ExecuteGameplayCue(GameplayCue.Fireball.Explosion) → replicated burst FX, then Destroy
+```
+
 ### HUD binding (Lyra-style)
 
 ```
@@ -106,9 +129,14 @@ Source/MultiPlayerAction/
 │   ├── Abilities/
 │   │   ├── MAGameplayAbilityBase.{h,cpp}  Base for all GAs (LocalPredicted + InstancedPerActor defaults)
 │   │   ├── GA_MeleeAttack.{h,cpp}         Reference ability — montage + sphere trace + damage GE + GameplayCue
-│   │   └── GA_Sprint.{h,cpp}              Hold-to-activate sprint, periodic Stamina drain, auto-end on Stamina=0
+│   │   ├── GA_Sprint.{h,cpp}              Hold-to-activate sprint, periodic Stamina drain, auto-end on Stamina=0
+│   │   └── GA_Fireball.{h,cpp}            Predicted cast + server-authoritative projectile spawn (cast-time spec snapshot)
+│   ├── Cues/
+│   │   └── GCN_ParticleBurst.{h,cpp}      Data-driven burst cue base — BP children are pure config, no graphs
 │   └── Executions/
 │       └── MADamageExecutionCalculation.{h,cpp}   Lyra-style damage formula (source AP snapshot × (1 - target Armor scale))
+├── Combat/
+│   └── MAProjectile.{h,cpp}               Server-authoritative replicated projectile: AoE overlap → spec → cue → destroy
 ├── Player/
 │   ├── MAPlayerState.{h,cpp}              Owns ASC + AttributeSet
 │   └── MAPlayerController.{h,cpp}         Spawns + binds HUD widget; ScheduleRespawn timer; DamageSelf Server RPC
@@ -122,12 +150,16 @@ Source/MultiPlayerAction/
 ```
 
 Content (BP / assets) under `Content/`:
-- `AbilitySystem/Abilities/` — `BP_GA_MeleeAttack`, `BP_GA_Sprint`
-- `AbilitySystem/GE/` — `BP_GE_Damage` (uses `MADamageExecutionCalculation`), `BP_GE_Cooldown_Melee`, `BP_GE_StaminaCost`, `BP_GE_StaminaRegen` (Periodic, OngoingTagRequirements suppresses during sprint)
-- `AbilitySystem/Cues/` — `BP_GCN_MeleeHit` (`GameplayCueNotify_Static`, P_Sparks at `FHitResult.ImpactPoint`)
+- `AbilitySystem/Abilities/` — `BP_GA_MeleeAttack`, `BP_GA_Sprint`, `BP_GA_Dodge`, `BP_GA_Fireball`
+- `AbilitySystem/GE/` — `BP_GE_Damage` (uses `MADamageExecutionCalculation`), `BP_GE_Cooldown_Melee`/`_Fireball`, `BP_GE_StaminaCost`/`_Fireball`, `BP_GE_StaminaRegen` (Periodic, OngoingTagRequirements suppresses during sprint)
+- `AbilitySystem/Cues/` — `BP_GCN_MeleeHit` (`GameplayCueNotify_Static`, P_Sparks at `FHitResult.ImpactPoint`), `BP_GCN_FireballExplosion` (`GCN_ParticleBurst` child — pure data, no graph)
+- `AbilitySystem/AM_Montage/` — `AM_MeleeAttack`, `AM_FireballCast` (cropped from a Mage bundle volley + release-frame `AN_SendGameplayEvent`)
+- `Blueprints/Combat/` — `BP_Projectile_Fireball` (visuals on top of `AMAProjectile`)
 - `Blueprints/AI/` — `BP_TargetDummy`, `BP_EnemyController`
 - `AI/` — `BB_Enemy` (Blackboard), `BT_Enemy` (BehaviorTree)
 - `UI/` — `WBP_HUD` (player), `WBP_EnemyHealthBar` (NPC)
+
+> Most of the fireball content above was authored **agent-side via [UnrealAgentMCP](Plugins/UnrealAgentMCP/)** — the in-editor MCP server developed alongside this project (montage creation/cropping, AnimNotify placement, GE configuration, skeleton compatibility registration all happened through MCP tools, several of which were built for exactly this feature).
 
 ---
 
@@ -136,7 +168,8 @@ Content (BP / assets) under `Content/`:
 Requirements:
 - Unreal Engine **5.5** (matches `MultiPlayerAction.uproject` `EngineAssociation`)
 - Visual Studio 2022 (Windows) / Xcode 15+ (macOS) with C++ workload
-- Optional: Starter Content (used by `BP_GCN_MeleeHit` for `P_Sparks` particle template)
+- Optional: Starter Content (used by `BP_GCN_MeleeHit`/`BP_GCN_FireballExplosion` for `P_Sparks`/`P_Explosion`/`P_Fire` particle templates)
+- Optional: Mage Animation Bundle samples (source `AnimSequence` for `AM_FireballCast`; the montage itself is committed)
 
 Steps:
 ```
@@ -153,7 +186,7 @@ Or via UBT externally:
   -Project="<absolute-path>/MultiPlayerAction.uproject" -WaitMutex
 ```
 
-PIE: open `Content/ThirdPerson/Maps/ThirdPersonMap`, set Number of Players ≥ 2 to exercise multiplayer replication. Walk near the `BP_TargetDummy` placed in the map — it will rotate + attack via BT. Console `DamageSelf 100` self-damages (Server RPC) to test ragdoll + respawn.
+PIE: open `Content/Maps/ThirdPersonMap`, set Number of Players ≥ 2 to exercise multiplayer replication (or start from `Maps/MainMenu` and Host/Join through the session front-end). **LMB** melee, **Q** fireball (predicted cast → server projectile → AoE), **Shift** sprint, **Ctrl** dodge i-frame. Walk near the `BP_TargetDummy` placed in the map — it will rotate + attack via BT. Console `DamageSelf 100` self-damages (Server RPC) to test ragdoll + respawn. Acceptance was also run at 100ms emulated latency (PIE Network Emulation).
 
 ---
 
