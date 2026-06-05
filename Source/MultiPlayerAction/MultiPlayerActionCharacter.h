@@ -61,6 +61,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* DodgeAction;
 
+	/** Fireball Input Action — Started fires once per press */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* FireballAction;
+
 public:
 	AMultiPlayerActionCharacter();
 
@@ -119,7 +123,9 @@ protected:
 	void OnSprintReleased();
 
 	void OnDodgeInput();
-			
+
+	void OnFireballInput();
+
 
 protected:
 

@@ -203,6 +203,12 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 		{
 			EnhancedInputComponent->BindAction(DodgeAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnDodgeInput);
 		}
+
+		// Fireball — single press triggers UGA_Fireball (predicted cast + server projectile)
+		if (FireballAction)
+		{
+			EnhancedInputComponent->BindAction(FireballAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnFireballInput);
+		}
 	}
 	else
 	{
@@ -282,6 +288,16 @@ void AMultiPlayerActionCharacter::OnDodgeInput()
 	{
 		FGameplayTagContainer AbilityTags;
 		AbilityTags.AddTag(MAGameplayTags::Ability_Movement_Dodge);
+		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnFireballInput()
+{
+	if (AbilitySystemComponent)
+	{
+		FGameplayTagContainer AbilityTags;
+		AbilityTags.AddTag(MAGameplayTags::Ability_Ranged_Fireball);
 		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
 	}
 }
