@@ -23,8 +23,9 @@ AMAProjectile::AMAProjectile()
 	CollisionComponent->SetCollisionObjectType(ECC_WorldDynamic);
 	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Block);
 	CollisionComponent->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
-	// Sweep-based movement reports blocking hits through OnComponentHit only when this is set.
-	CollisionComponent->SetNotifyRigidBodyCollision(true);
+	// No bNotifyRigidBodyCollision needed: ProjectileMovement moves via sweeps, and a blocking sweep
+	// always broadcasts OnComponentHit through UPrimitiveComponent/AActor::DispatchBlockingHit —
+	// that flag only gates physics-simulation contact events, which QueryOnly never generates.
 	RootComponent = CollisionComponent;
 
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
