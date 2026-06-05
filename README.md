@@ -130,6 +130,7 @@ Source/MultiPlayerAction/
 │   │   ├── MAGameplayAbilityBase.{h,cpp}  Base for all GAs (LocalPredicted + InstancedPerActor defaults)
 │   │   ├── GA_MeleeAttack.{h,cpp}         Reference ability — montage + sphere trace + damage GE + GameplayCue
 │   │   ├── GA_Sprint.{h,cpp}              Hold-to-activate sprint, periodic Stamina drain, auto-end on Stamina=0
+│   │   ├── GA_Dodge.{h,cpp}               Dash + i-frame via State.Dodging ActivationOwnedTags (GE IgnoreTags)
 │   │   └── GA_Fireball.{h,cpp}            Predicted cast + server-authoritative projectile spawn (cast-time spec snapshot)
 │   ├── Cues/
 │   │   └── GCN_ParticleBurst.{h,cpp}      Data-driven burst cue base — BP children are pure config, no graphs
@@ -169,7 +170,7 @@ Requirements:
 - Unreal Engine **5.5** (matches `MultiPlayerAction.uproject` `EngineAssociation`)
 - Visual Studio 2022 (Windows) / Xcode 15+ (macOS) with C++ workload
 - Optional: Starter Content (used by `BP_GCN_MeleeHit`/`BP_GCN_FireballExplosion` for `P_Sparks`/`P_Explosion`/`P_Fire` particle templates)
-- Optional: Mage Animation Bundle samples (source `AnimSequence` for `AM_FireballCast`; the montage itself is committed)
+- Optional: Mage Animation Bundle samples (source `AnimSequence` + skeleton for `AM_FireballCast`; the montage itself is committed, and `SK_Mannequin` carries a compatible-skeleton entry pointing at the bundle's skeleton — it dangles harmlessly as a soft reference if the bundle isn't installed, only the fireball cast animation degrades)
 
 Steps:
 ```
