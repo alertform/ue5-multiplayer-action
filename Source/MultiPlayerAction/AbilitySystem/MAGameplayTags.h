@@ -36,4 +36,8 @@ namespace MAGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Fireball);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_SpawnProjectile);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Fireball_Explosion);
+
+	// Rooted-cast state — owned while a cast roots the character; dodge/melee/sprint block on it
+	// (LaunchCharacter is swallowed under MOVE_None; montage interrupts waste committed cost+CD).
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Casting);
 }

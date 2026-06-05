@@ -15,6 +15,9 @@ UGA_Sprint::UGA_Sprint()
 	SetAssetTags(AssetTagsValue);
 
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);
+	// No sprinting while rooted by a cast (the cast already cancels an ACTIVE sprint via
+	// CancelAbilitiesWithTag — this blocks starting a NEW one mid-cast).
+	ActivationBlockedTags.AddTag(MAGameplayTags::State_Casting);
 
 	// Tag挂到 ASC 在整个 sprint 激活期间 — BP_GE_StaminaRegen 配 IgnoreTags 即停止 regen tick
 	ActivationOwnedTags.AddTag(MAGameplayTags::Ability_Movement_Sprint);

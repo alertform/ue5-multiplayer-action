@@ -22,6 +22,11 @@ UGA_Fireball::UGA_Fireball()
 
 	// Casting auto-cancels active sprint, same as melee
 	CancelAbilitiesWithTag.AddTag(MAGameplayTags::Ability_Movement_Sprint);
+
+	// The cast roots the character (MOVE_None) — own State.Casting so dodge/melee/sprint are
+	// blocked for the duration: LaunchCharacter is silently swallowed under MOVE_None, and a
+	// melee montage interrupt would waste the already-committed fireball cost + cooldown.
+	ActivationOwnedTags.AddTag(MAGameplayTags::State_Casting);
 }
 
 void UGA_Fireball::ActivateAbility(const FGameplayAbilitySpecHandle Handle,

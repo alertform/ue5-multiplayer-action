@@ -18,6 +18,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 
 	// Cannot attack while dead — checked at TryActivate time, no need for runtime guard
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);
+	// No attacking out of a rooted cast — the melee montage would interrupt the fireball montage,
+	// wasting the already-committed fireball cost + cooldown before its projectile spawns.
+	ActivationBlockedTags.AddTag(MAGameplayTags::State_Casting);
 
 	// Attacking auto-cancels active sprint (multi-ability interrupt demo)
 	CancelAbilitiesWithTag.AddTag(MAGameplayTags::Ability_Movement_Sprint);

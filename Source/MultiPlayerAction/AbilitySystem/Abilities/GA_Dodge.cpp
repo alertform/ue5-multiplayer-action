@@ -14,6 +14,9 @@ UGA_Dodge::UGA_Dodge()
 	SetAssetTags(AssetTagsValue);
 
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);
+	// No dodging out of a rooted cast — LaunchCharacter is swallowed under MOVE_None,
+	// which would grant the i-frame without the dash.
+	ActivationBlockedTags.AddTag(MAGameplayTags::State_Casting);
 
 	// During dodge, ASC has State.Dodging — BP_GE_Damage's ApplicationTagRequirements.IgnoreTags
 	// must include State.Dodging for the i-frame to actually block damage.

@@ -37,4 +37,7 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Fireball_Explosion, "GameplayCue.Fireball.Explosion",
 		"Explosion FX cue executed from AMAProjectile::Explode with impact location — drives BP_GCN_FireballExplosion");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Casting, "State.Casting",
+		"ActivationOwnedTags during a rooted cast (UGA_Fireball); dodge/melee/sprint list this in ActivationBlockedTags");
 }
