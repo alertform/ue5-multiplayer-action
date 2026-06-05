@@ -21,8 +21,12 @@ AMAProjectile::AMAProjectile()
 	CollisionComponent->InitSphereRadius(15.f);
 	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	CollisionComponent->SetCollisionObjectType(ECC_WorldDynamic);
-	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Block);
-	CollisionComponent->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	// Detonate ONLY on pawns and world geometry. Ignore-all first so the bolt is itself an
+	// ECC_WorldDynamic object that does NOT block other bolts — block-all made two crossing
+	// fireballs explode mid-air on each other (review finding).
+	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
 	// No bNotifyRigidBodyCollision needed: ProjectileMovement moves via sweeps, and a blocking sweep
 	// always broadcasts OnComponentHit through UPrimitiveComponent/AActor::DispatchBlockingHit —
 	// that flag only gates physics-simulation contact events, which QueryOnly never generates.
