@@ -81,11 +81,20 @@ private:
 	FDelegateHandle FindSessionsHandle;
 	FDelegateHandle JoinSessionHandle;
 	FDelegateHandle DestroySessionHandle;
+	FDelegateHandle StaleDestroyHandle;
+
+	/** Host/Join request parked while an async destroy of a stale session is in flight. */
+	int32 PendingHostConnections = INDEX_NONE;
+	int32 PendingJoinIndex = INDEX_NONE;
 
 	void HandleCreateSessionComplete(FName InSessionName, bool bWasSuccessful);
 	void HandleFindSessionsComplete(bool bWasSuccessful);
 	void HandleJoinSessionComplete(FName InSessionName, EOnJoinSessionCompleteResult::Type Result);
 	void HandleDestroySessionComplete(FName InSessionName, bool bWasSuccessful);
+	void HandleStaleSessionDestroyed(FName InSessionName, bool bWasSuccessful);
+
+	void StartCreateSession(int32 NumPublicConnections);
+	void StartJoinSession(int32 SessionIndex);
 
 	IOnlineSessionPtr GetSessionInterface() const;
 	FString BuildNameOption() const;

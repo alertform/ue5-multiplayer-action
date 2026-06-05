@@ -29,13 +29,37 @@ void UMASessionSubsystem::HostSession(int32 NumPublicConnections, const FString&
 		return;
 	}
 
-	// If a session already exists, destroy it first (e.g. retry after a failed attempt)
+	PendingTravelURL = MapName + TEXT("?listen") + BuildNameOption();
+
+	// A stale named session (left over from a previous PIE run — the NULL OSS is
+	// process-wide) blocks CreateSession. DestroySession is ASYNC: racing CreateSession
+	// against it is what made the first Host click fail. Chain create after the destroy.
 	if (Sessions->GetNamedSession(SessionName))
 	{
-		Sessions->DestroySession(SessionName);
+		PendingHostConnections = NumPublicConnections;
+		PendingJoinIndex = INDEX_NONE;
+		StaleDestroyHandle = Sessions->AddOnDestroySessionCompleteDelegate_Handle(
+			FOnDestroySessionCompleteDelegate::CreateUObject(this, &UMASessionSubsystem::HandleStaleSessionDestroyed));
+		if (!Sessions->DestroySession(SessionName))
+		{
+			Sessions->ClearOnDestroySessionCompleteDelegate_Handle(StaleDestroyHandle);
+			PendingHostConnections = INDEX_NONE;
+			OnHostSessionComplete.Broadcast(false);
+		}
+		return;
 	}
 
-	PendingTravelURL = MapName + TEXT("?listen") + BuildNameOption();
+	StartCreateSession(NumPublicConnections);
+}
+
+void UMASessionSubsystem::StartCreateSession(int32 NumPublicConnections)
+{
+	IOnlineSessionPtr Sessions = GetSessionInterface();
+	if (!Sessions.IsValid())
+	{
+		OnHostSessionComplete.Broadcast(false);
+		return;
+	}
 
 	FOnlineSessionSettings Settings;
 	Settings.NumPublicConnections = FMath::Max(1, NumPublicConnections);
@@ -55,6 +79,35 @@ void UMASessionSubsystem::HostSession(int32 NumPublicConnections, const FString&
 	{
 		Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionHandle);
 		OnHostSessionComplete.Broadcast(false);
+	}
+}
+
+void UMASessionSubsystem::HandleStaleSessionDestroyed(FName InSessionName, bool bWasSuccessful)
+{
+	if (IOnlineSessionPtr Sessions = GetSessionInterface())
+	{
+		Sessions->ClearOnDestroySessionCompleteDelegate_Handle(StaleDestroyHandle);
+	}
+
+	const int32 HostConnections = PendingHostConnections;
+	const int32 JoinIndex = PendingJoinIndex;
+	PendingHostConnections = INDEX_NONE;
+	PendingJoinIndex = INDEX_NONE;
+
+	if (!bWasSuccessful)
+	{
+		if (HostConnections != INDEX_NONE) { OnHostSessionComplete.Broadcast(false); }
+		if (JoinIndex != INDEX_NONE)       { OnJoinSessionComplete.Broadcast(false); }
+		return;
+	}
+
+	if (HostConnections != INDEX_NONE)
+	{
+		StartCreateSession(HostConnections);
+	}
+	else if (JoinIndex != INDEX_NONE)
+	{
+		StartJoinSession(JoinIndex);
 	}
 }
 
@@ -130,6 +183,40 @@ void UMASessionSubsystem::HandleFindSessionsComplete(bool bWasSuccessful)
 // ---------- Join ----------
 
 void UMASessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
+{
+	IOnlineSessionPtr Sessions = GetSessionInterface();
+	if (!Sessions.IsValid() || !SearchSettings.IsValid() ||
+		!SearchSettings->SearchResults.IsValidIndex(SessionIndex))
+	{
+		OnJoinSessionComplete.Broadcast(false);
+		return;
+	}
+
+	// Same stale-session hazard as HostSession: a leftover named session makes
+	// JoinSession bail immediately with AlreadyInSession. Destroy, then join.
+	// (NOTE: only ever a leftover from THIS instance's previous run — with PIE's
+	// "Run Under One Process" enabled all instances share one NULL OSS and the
+	// host's live session would be hit here; multiplayer PIE testing requires
+	// that setting OFF.)
+	if (Sessions->GetNamedSession(SessionName))
+	{
+		PendingJoinIndex = SessionIndex;
+		PendingHostConnections = INDEX_NONE;
+		StaleDestroyHandle = Sessions->AddOnDestroySessionCompleteDelegate_Handle(
+			FOnDestroySessionCompleteDelegate::CreateUObject(this, &UMASessionSubsystem::HandleStaleSessionDestroyed));
+		if (!Sessions->DestroySession(SessionName))
+		{
+			Sessions->ClearOnDestroySessionCompleteDelegate_Handle(StaleDestroyHandle);
+			PendingJoinIndex = INDEX_NONE;
+			OnJoinSessionComplete.Broadcast(false);
+		}
+		return;
+	}
+
+	StartJoinSession(SessionIndex);
+}
+
+void UMASessionSubsystem::StartJoinSession(int32 SessionIndex)
 {
 	IOnlineSessionPtr Sessions = GetSessionInterface();
 	if (!Sessions.IsValid() || !SearchSettings.IsValid() ||
