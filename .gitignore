@@ -82,3 +82,6 @@ Content/StarterContent/**
 !Content/StarterContent/Textures/T_Statue_M.uasset
 !Content/StarterContent/Textures/T_Statue_N.uasset
 !Content/StarterContent/Textures/T_Water_N.uasset
+
+# UnrealAgentMCP lives in its own private repo - do not track in the public game repo
+Plugins/UnrealAgentMCP/

@@ -2,7 +2,7 @@
 
 Lyra-style PvE melee combat demo built on Unreal Engine 5.5 — full **Gameplay Ability System** (GAS) stack, multiplayer replication, AI driven by **BehaviorTree** sharing the same `GameplayAbility` C++ classes as the player. Personal portfolio project.
 
-> Built alongside (and largely *with*) **[UnrealAgentMCP](https://github.com/alertform/UnrealAgentMCP)** — a self-developed in-editor MCP server (57 tools / 55 automation tests) that lets an AI agent author Blueprints, UMG, AnimGraphs, BehaviorTrees and level content directly inside the running editor. Most of this project's content-side work (montages, GE configs, widget trees, BT nodes, AnimGraph layering, arena dressing) was authored agent-side through it. The plugin lives in [`Plugins/UnrealAgentMCP`](Plugins/UnrealAgentMCP/) and has its own standalone repo.
+> Built alongside (and largely *with*) **UnrealAgentMCP** — a self-developed in-editor MCP server (57 tools / 55 automation tests) that lets an AI agent author Blueprints, UMG, AnimGraphs, BehaviorTrees and level content directly inside the running editor. Most of this project's content-side work (montages, GE configs, widget trees, BT nodes, AnimGraph layering, arena dressing) was authored agent-side through it. The plugin is developed in a separate **private** repo (demo available on request); it is not required to build or run this project.
 
 | | |
 |---|---|
@@ -180,7 +180,7 @@ Content (BP / assets) under `Content/`:
 - `AI/` — `BB_Enemy` (Blackboard), `BT_Enemy` (BehaviorTree)
 - `Blueprints/UI/` — `WBP_HUD` (chip health bar + skill bar), `WBP_SkillSlot`, `WBP_MainMenu` (MVVM); `UI/` — `WBP_HealthBar` (shared player/NPC chip bar), `WBP_MASessionRowWidget`
 
-> The bulk of the content above was authored **agent-side via [UnrealAgentMCP](Plugins/UnrealAgentMCP/)**: montage creation/cropping, AnimNotify placement, GE configuration, BehaviorTree nodes, UMG widget trees + MVVM bindings, AnimGraph surgery (cached-pose/slot/layered-blend/ModifyBone chains) and the arena dressing all happened through MCP tools — several of which were built (with save/reload regression tests) precisely because this project needed them. That dogfooding loop is the second half of the portfolio: see the [plugin README](Plugins/UnrealAgentMCP/README.md).
+> The bulk of the content above was authored **agent-side via UnrealAgentMCP** (private repo): montage creation/cropping, AnimNotify placement, GE configuration, BehaviorTree nodes, UMG widget trees + MVVM bindings, AnimGraph surgery (cached-pose/slot/layered-blend/ModifyBone chains) and the arena dressing all happened through MCP tools — several of which were built (with save/reload regression tests) precisely because this project needed them. That dogfooding loop is the second half of the portfolio.
 
 ---
 
