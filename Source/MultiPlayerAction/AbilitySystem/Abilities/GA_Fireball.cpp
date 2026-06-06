@@ -51,19 +51,7 @@ void UGA_Fireball::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	// Demo feedback fixes: snap the character to the aim direction so the cast animation,
-	// the projectile, and the camera agree; and root the caster for the cast duration.
-	// Runs on both the predicting client and the server — rotation/movement-mode replicate.
-	if (ACharacter* AvatarCharacter = Cast<ACharacter>(ActorInfo->AvatarActor.Get()))
-	{
-		const FRotator AimYaw(0.f, AvatarCharacter->GetBaseAimRotation().Yaw, 0.f);
-		AvatarCharacter->SetActorRotation(AimYaw);
-
-		if (UCharacterMovementComponent* MoveComp = AvatarCharacter->GetCharacterMovement())
-		{
-			MoveComp->DisableMovement();
-		}
-	}
+	BeginRootedAction(ActorInfo);
 
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 		this, NAME_None, CastMontage, MontagePlayRate);
@@ -150,21 +138,7 @@ void UGA_Fireball::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	bool bReplicateEndAbility, bool bWasCancelled)
 {
-	// Restore movement locked in ActivateAbility — but only if nothing else changed the mode
-	// (death ragdoll etc. must not be stomped back to walking).
-	if (ActorInfo)
-	{
-		if (ACharacter* AvatarCharacter = Cast<ACharacter>(ActorInfo->AvatarActor.Get()))
-		{
-			if (UCharacterMovementComponent* MoveComp = AvatarCharacter->GetCharacterMovement())
-			{
-				if (MoveComp->MovementMode == MOVE_None)
-				{
-					MoveComp->SetMovementMode(MOVE_Walking);
-				}
-			}
-		}
-	}
+	EndRootedAction(ActorInfo);
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

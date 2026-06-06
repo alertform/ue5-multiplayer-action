@@ -24,6 +24,10 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 
 	// Attacking auto-cancels active sprint (multi-ability interrupt demo)
 	CancelAbilitiesWithTag.AddTag(MAGameplayTags::Ability_Movement_Sprint);
+
+	// Swing commits the character — same exclusion group as the fireball cast;
+	// blocks dodge/sprint mid-swing so movement input doesn't cause slide-while-attacking.
+	ActivationOwnedTags.AddTag(MAGameplayTags::State_Casting);
 }
 
 void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -42,6 +46,8 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+
+	BeginRootedAction(ActorInfo);
 
 	// Play montage at configurable rate (default 2.0x — see MontagePlayRate UPROPERTY)
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
@@ -135,4 +141,14 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 		CueParams.EffectCauser = Avatar;
 		SourceASC->ExecuteGameplayCue(MAGameplayTags::GameplayCue_Melee_Hit, CueParams);
 	}
+}
+
+void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	bool bReplicateEndAbility, bool bWasCancelled)
+{
+	EndRootedAction(ActorInfo);
+
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

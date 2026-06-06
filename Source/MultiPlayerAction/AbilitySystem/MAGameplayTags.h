@@ -27,14 +27,14 @@ namespace MAGameplayTags
 	// Sprint ability identification — used by GA_MeleeAttack's CancelAbilitiesWithTag to interrupt sprint on attack.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Movement_Sprint);
 
-	// Dodge ability + dodge invincibility frame state tag.
+	// Dodge ability + dodge invincibility frame state tag + dodge cooldown.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Movement_Dodge);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dodging);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Dodge);
 
 	// Fireball ranged ability family — activation tag, cooldown, montage release event, explosion cue.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Ranged_Fireball);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Fireball);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Dodge);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_SpawnProjectile);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Fireball_Explosion);
 

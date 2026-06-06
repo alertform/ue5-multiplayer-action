@@ -23,4 +23,12 @@ public:
 protected:
 	/** Get the avatar actor cast to our character class */
 	class AMultiPlayerActionCharacter* GetMACharacter(const FGameplayAbilityActorInfo* ActorInfo) const;
+
+	/** Snap the avatar to its aim yaw and root it (MOVE_None) for the action's duration.
+	 *  Call from ActivateAbility after CommitAbility; pair with EndRootedAction in EndAbility.
+	 *  Runs on both the predicting client and the server — rotation/movement-mode replicate. */
+	void BeginRootedAction(const FGameplayAbilityActorInfo* ActorInfo) const;
+
+	/** Restore MOVE_Walking, but only if still MOVE_None — death ragdoll etc. must not be stomped. */
+	void EndRootedAction(const FGameplayAbilityActorInfo* ActorInfo) const;
 };
