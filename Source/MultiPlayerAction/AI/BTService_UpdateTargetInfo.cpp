@@ -2,8 +2,8 @@
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/MAGameplayTags.h"
@@ -29,28 +29,39 @@ void UBTService_UpdateTargetInfo::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 	APawn* MyPawn = AIC->GetPawn();
 	if (!MyPawn) return;
 
-	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
-
-	// Treat dead pawns as no target — the pawn persists briefly as a ragdoll during the
-	// death→respawn gap; without this check the AI chases a corpse.
-	if (PlayerPawn)
+	// Target = NEAREST LIVING player pawn. GetPlayerPawn(0) only ever tracked the host's
+	// pawn (local player 0 on the server) — clients were invisible to the AI in multiplayer.
+	// Dead pawns are skipped: the ragdoll persists through the death→respawn gap and the AI
+	// would otherwise chase a corpse.
+	APawn* PlayerPawn = nullptr;
+	float BestDistSq = TNumericLimits<float>::Max();
+	for (FConstPlayerControllerIterator It = MyPawn->GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(PlayerPawn))
+		const APlayerController* PC = It->Get();
+		APawn* Candidate = PC ? PC->GetPawn() : nullptr;
+		if (!Candidate)
+		{
+			continue;
+		}
+
+		if (const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Candidate))
 		{
 			if (ASC->HasMatchingGameplayTag(MAGameplayTags::State_Dead))
 			{
-				PlayerPawn = nullptr;
+				continue;
 			}
+		}
+
+		const float DistSq = FVector::DistSquared(MyPawn->GetActorLocation(), Candidate->GetActorLocation());
+		if (DistSq < BestDistSq)
+		{
+			BestDistSq = DistSq;
+			PlayerPawn = Candidate;
 		}
 	}
 
 	BB->SetValueAsObject(TargetActorKey.SelectedKeyName, PlayerPawn);
 
-	bool bInRange = false;
-	if (PlayerPawn)
-	{
-		const float DistSq = FVector::DistSquared(MyPawn->GetActorLocation(), PlayerPawn->GetActorLocation());
-		bInRange = DistSq <= AttackRange * AttackRange;
-	}
+	const bool bInRange = PlayerPawn && BestDistSq <= AttackRange * AttackRange;
 	BB->SetValueAsBool(InRangeKey.SelectedKeyName, bInRange);
 }
