@@ -32,6 +32,9 @@ namespace MAGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Cooldown_Fireball, "Ability.Cooldown.Fireball",
 		"Cooldown tag granted by BP_GE_Cooldown_Fireball — blocks UGA_Fireball while present");
 
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Cooldown_Dodge, "Ability.Cooldown.Dodge",
+		"Cooldown tag granted by BP_GE_Cooldown_Dodge — blocks UGA_Dodge while present (2s; ends infinite i-frame rolls)");
+
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_SpawnProjectile, "Event.Montage.SpawnProjectile",
 		"GameplayEvent sent from AnimNotify on AM_FireballCast's release frame — server spawns the projectile here");
 
