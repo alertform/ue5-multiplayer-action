@@ -42,6 +42,9 @@ void UMAHealthBarWidget::ApplyBarStyles()
 		Style.BackgroundImage = MakeRoundedBrush(TrackColor, CornerRadius, OutlineColor, OutlineWidth);
 		Style.FillImage = MakeRoundedBrush(ChipColor, CornerRadius, FLinearColor::Transparent, 0.f);
 		ChipFill->SetWidgetStyle(Style);
+		// UProgressBar's CDO defaults FillColorAndOpacity to BLUE (0, 0.5, 1) and MULTIPLIES
+		// it over the fill brush — neutralize it or every brush color ships tinted teal.
+		ChipFill->SetFillColorAndOpacity(FLinearColor::White);
 	}
 	if (HealthFill)
 	{
@@ -50,6 +53,7 @@ void UMAHealthBarWidget::ApplyBarStyles()
 		Style.BackgroundImage = MakeNoDrawBrush();
 		Style.FillImage = MakeRoundedBrush(HealthColor, CornerRadius, FLinearColor::Transparent, 0.f);
 		HealthFill->SetWidgetStyle(Style);
+		HealthFill->SetFillColorAndOpacity(FLinearColor::White);
 	}
 }
 
