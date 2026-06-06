@@ -10,6 +10,7 @@ const FLinearColor UMASkillSlotWidget::ActiveColor(1.0f, 0.78f, 0.35f, 0.95f);
 void UMASkillSlotWidget::InitSlot(UAbilitySystemComponent* InASC)
 {
 	ASC = InASC;
+	bWasCoolingDown = false; // reset edge state when (re)bound
 }
 
 void UMASkillSlotWidget::NativePreConstruct()
