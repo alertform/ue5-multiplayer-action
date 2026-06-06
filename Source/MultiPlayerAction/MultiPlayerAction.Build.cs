@@ -15,7 +15,7 @@ public class MultiPlayerAction : ModuleRules
 			// GAS
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			// AI
-			"AIModule",
+			"AIModule", "NavigationSystem",
 			// Networking + Session
 			"NetCore", "OnlineSubsystem", "OnlineSubsystemUtils",
 			// UI

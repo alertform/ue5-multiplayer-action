@@ -4,6 +4,8 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/MAGameplayTags.h"
@@ -29,12 +31,19 @@ void UBTService_UpdateTargetInfo::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 	APawn* MyPawn = AIC->GetPawn();
 	if (!MyPawn) return;
 
-	// Target = NEAREST LIVING player pawn. GetPlayerPawn(0) only ever tracked the host's
-	// pawn (local player 0 on the server) — clients were invisible to the AI in multiplayer.
-	// Dead pawns are skipped: the ragdoll persists through the death→respawn gap and the AI
-	// would otherwise chase a corpse.
+	// Target = nearest LIVING player pawn, preferring REACHABLE ones.
+	// - GetPlayerPawn(0) only ever tracked the host's pawn — clients were invisible in multiplayer.
+	// - Dead pawns are skipped: the ragdoll persists through the death→respawn gap.
+	// - Unreachable pawns (no nav path, e.g. standing where the navmesh is disconnected) lose to
+	//   reachable ones regardless of distance — otherwise the AI locks onto a target it can never
+	//   reach instead of switching. If NO ONE is reachable we still take the nearest living pawn,
+	//   so close-range rotate/attack keeps working without a path.
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(MyPawn->GetWorld());
+	const FVector MyLocation = MyPawn->GetActorLocation();
+
 	APawn* PlayerPawn = nullptr;
 	float BestDistSq = TNumericLimits<float>::Max();
+	bool bBestReachable = false;
 	for (FConstPlayerControllerIterator It = MyPawn->GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		const APlayerController* PC = It->Get();
@@ -52,11 +61,24 @@ void UBTService_UpdateTargetInfo::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 			}
 		}
 
-		const float DistSq = FVector::DistSquared(MyPawn->GetActorLocation(), Candidate->GetActorLocation());
-		if (DistSq < BestDistSq)
+		// Synchronous path probe — cheap at this service's 0.5s interval with ≤ a handful of players.
+		bool bReachable = false;
+		if (NavSys)
+		{
+			const UNavigationPath* Path = NavSys->FindPathToLocationSynchronously(
+				MyPawn->GetWorld(), MyLocation, Candidate->GetActorLocation(), MyPawn);
+			bReachable = Path && Path->IsValid() && !Path->IsPartial();
+		}
+
+		const float DistSq = FVector::DistSquared(MyLocation, Candidate->GetActorLocation());
+		// Reachability outranks distance; distance breaks ties within the same tier.
+		const bool bBetter = (bReachable && !bBestReachable)
+			|| (bReachable == bBestReachable && DistSq < BestDistSq);
+		if (bBetter)
 		{
 			BestDistSq = DistSq;
 			PlayerPawn = Candidate;
+			bBestReachable = bReachable;
 		}
 	}
 
