@@ -41,8 +41,9 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	}
 
 	// Face the camera direction for the swing — feels natural and keeps the forward-vector
-	// hit trace aligned with where the player is actually aiming.
-	SnapToAimYaw(ActorInfo);
+	// hit trace aligned with where the player is actually aiming. Orient-to-movement is
+	// suspended for the swing so the snap holds while running; restored in EndAbility.
+	BeginAimFacing(ActorInfo);
 
 	// Play montage at configurable rate (default 2.0x — see MontagePlayRate UPROPERTY)
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
@@ -60,6 +61,17 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	EventTask->EventReceived.AddDynamic(this, &UGA_MeleeAttack::OnMontageEvent);
 	EventTask->ReadyForActivation();
+}
+
+void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	bool bReplicateEndAbility, bool bWasCancelled)
+{
+	// Single funnel for every end path (completed / interrupted / cancelled / commit-fail):
+	// restore the orient-to-movement suspended by BeginAimFacing.
+	EndAimFacing(ActorInfo);
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UGA_MeleeAttack::OnMontageEvent(FGameplayEventData EventData)

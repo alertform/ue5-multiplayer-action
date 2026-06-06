@@ -29,6 +29,38 @@ void UMAGameplayAbilityBase::SnapToAimYaw(const FGameplayAbilityActorInfo* Actor
 	}
 }
 
+void UMAGameplayAbilityBase::BeginAimFacing(const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	// Snap to the camera yaw, then stop the CMC from immediately rotating the body back
+	// toward the acceleration direction (bOrientRotationToMovement wins one tick after a
+	// bare SetActorRotation). Runs on predicting client + server; rotation replicates.
+	SnapToAimYaw(ActorInfo);
+
+	if (ACharacter* AvatarCharacter = Cast<ACharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr))
+	{
+		if (UCharacterMovementComponent* MoveComp = AvatarCharacter->GetCharacterMovement())
+		{
+			MoveComp->bOrientRotationToMovement = false;
+		}
+	}
+}
+
+void UMAGameplayAbilityBase::EndAimFacing(const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	// Restore the character default (orient-to-movement is the template's locomotion mode).
+	// Idempotent — safe on end paths where BeginAimFacing never ran.
+	if (ActorInfo)
+	{
+		if (ACharacter* AvatarCharacter = Cast<ACharacter>(ActorInfo->AvatarActor.Get()))
+		{
+			if (UCharacterMovementComponent* MoveComp = AvatarCharacter->GetCharacterMovement())
+			{
+				MoveComp->bOrientRotationToMovement = true;
+			}
+		}
+	}
+}
+
 void UMAGameplayAbilityBase::BeginRootedAction(const FGameplayAbilityActorInfo* ActorInfo) const
 {
 	// Aim-snap + root the avatar for the action's duration (movement-mode replicates).

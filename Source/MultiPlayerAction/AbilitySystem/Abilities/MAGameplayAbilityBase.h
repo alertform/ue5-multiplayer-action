@@ -25,8 +25,18 @@ protected:
 	class AMultiPlayerActionCharacter* GetMACharacter(const FGameplayAbilityActorInfo* ActorInfo) const;
 
 	/** Snap the avatar to the camera's yaw so the action fires where the player is looking.
-	 *  Call from ActivateAbility after CommitAbility. Runs on predicting client + server. */
+	 *  Runs on predicting client + server. NOTE: with bOrientRotationToMovement the CMC
+	 *  rotates the body back toward the move direction one tick later — for mobile actions
+	 *  use BeginAimFacing/EndAimFacing instead so the snap holds for the action's duration. */
 	void SnapToAimYaw(const FGameplayAbilityActorInfo* ActorInfo) const;
+
+	/** SnapToAimYaw + disable orient-to-movement so the snapped yaw holds while moving.
+	 *  Call from ActivateAbility after CommitAbility; pair with EndAimFacing in EndAbility. */
+	void BeginAimFacing(const FGameplayAbilityActorInfo* ActorInfo) const;
+
+	/** Re-enable orient-to-movement disabled by BeginAimFacing. Safe on paths where
+	 *  BeginAimFacing never ran (the flag is simply set back to the character default). */
+	void EndAimFacing(const FGameplayAbilityActorInfo* ActorInfo) const;
 
 	/** SnapToAimYaw + root (MOVE_None) for the action's duration; pair with EndRootedAction
 	 *  in EndAbility. Currently unused (upper-body layering replaced rooting) — kept for

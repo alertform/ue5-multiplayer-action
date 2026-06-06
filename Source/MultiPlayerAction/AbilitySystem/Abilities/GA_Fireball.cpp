@@ -56,9 +56,10 @@ void UGA_Fireball::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	// Mobile cast: upper-body layering keeps the legs running; only snap to the camera yaw
-	// so the cast visual starts where the player is looking.
-	SnapToAimYaw(ActorInfo);
+	// Mobile cast: upper-body layering keeps the legs running; snap to the camera yaw so the
+	// cast visual starts where the player is looking, and suspend orient-to-movement so the
+	// snap holds while running (restored in EndAbility).
+	BeginAimFacing(ActorInfo);
 
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 		this, NAME_None, CastMontage, MontagePlayRate);
@@ -75,6 +76,17 @@ void UGA_Fireball::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	EventTask->EventReceived.AddDynamic(this, &UGA_Fireball::OnMontageEvent);
 	EventTask->ReadyForActivation();
+}
+
+void UGA_Fireball::EndAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	bool bReplicateEndAbility, bool bWasCancelled)
+{
+	// Single funnel for every end path (completed / interrupted / cancelled / commit-fail):
+	// restore the orient-to-movement suspended by BeginAimFacing.
+	EndAimFacing(ActorInfo);
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UGA_Fireball::OnMontageEvent(FGameplayEventData EventData)
