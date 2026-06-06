@@ -41,4 +41,8 @@ namespace MAGameplayTags
 	// Rooted-cast state — owned while a cast roots the character; dodge/melee/sprint block on it
 	// (LaunchCharacter is swallowed under MOVE_None; montage interrupts waste committed cost+CD).
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Casting);
+
+	// Melee swing state — owned for the swing's duration; drives the AnimInstance upper-body
+	// aim twist (spine chain toward camera yaw) together with State.Casting.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Attacking);
 }

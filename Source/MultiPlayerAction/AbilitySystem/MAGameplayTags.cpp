@@ -43,4 +43,7 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Casting, "State.Casting",
 		"ActivationOwnedTags during a rooted cast (UGA_Fireball); dodge/melee/sprint list this in ActivationBlockedTags");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Attacking, "State.Attacking",
+		"ActivationOwnedTags during the melee swing (UGA_MeleeAttack); with State.Casting it gates the AnimInstance upper-body aim twist");
 }

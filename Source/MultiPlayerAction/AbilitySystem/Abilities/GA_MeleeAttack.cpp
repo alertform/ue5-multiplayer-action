@@ -21,6 +21,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	// No attacking out of a rooted cast — the melee montage would interrupt the fireball montage,
 	// wasting the already-committed fireball cost + cooldown before its projectile spawns.
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Casting);
+	// Owned for the swing's duration: gates the AnimInstance upper-body aim twist
+	// (spine chain toward camera yaw) — see UMAAnimInstance::NativeUpdateAnimation.
+	ActivationOwnedTags.AddTag(MAGameplayTags::State_Attacking);
 }
 
 void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -40,10 +43,9 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	// Face the camera direction for the swing — feels natural and keeps the forward-vector
-	// hit trace aligned with where the player is actually aiming. Orient-to-movement is
-	// suspended for the swing so the snap holds while running; restored in EndAbility.
-	BeginAimFacing(ActorInfo);
+	// No actor rotation here: the upper body visually turns toward the camera via the
+	// AnimInstance spine twist (gated on our owned State.Attacking), the legs keep
+	// following orient-to-movement, and PerformHitTrace aims with the camera yaw directly.
 
 	// Play montage at configurable rate (default 2.0x — see MontagePlayRate UPROPERTY)
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
@@ -61,17 +63,6 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	EventTask->EventReceived.AddDynamic(this, &UGA_MeleeAttack::OnMontageEvent);
 	EventTask->ReadyForActivation();
-}
-
-void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	bool bReplicateEndAbility, bool bWasCancelled)
-{
-	// Single funnel for every end path (completed / interrupted / cancelled / commit-fail):
-	// restore the orient-to-movement suspended by BeginAimFacing.
-	EndAimFacing(ActorInfo);
-	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UGA_MeleeAttack::OnMontageEvent(FGameplayEventData EventData)
@@ -100,8 +91,16 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 		return;
 	}
 
-	const FVector Start = Avatar->GetActorLocation() + Avatar->GetActorForwardVector() * 50.f;
-	const FVector End = Start + Avatar->GetActorForwardVector() * TraceDistance;
+	// Trace along the camera yaw, not the body facing — the actor keeps orient-to-movement
+	// during the (mobile) swing, so the body may point elsewhere while the player aims.
+	// AI pawns: GetBaseAimRotation falls back to the actor rotation — same as before.
+	const APawn* AvatarPawn = Cast<APawn>(Avatar);
+	const FRotator AimYaw(0.f,
+		AvatarPawn ? AvatarPawn->GetBaseAimRotation().Yaw : Avatar->GetActorRotation().Yaw, 0.f);
+	const FVector AimDir = AimYaw.Vector();
+
+	const FVector Start = Avatar->GetActorLocation() + AimDir * 50.f;
+	const FVector End = Start + AimDir * TraceDistance;
 
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(Avatar);

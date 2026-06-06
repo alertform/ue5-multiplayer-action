@@ -31,7 +31,8 @@ protected:
 	void SnapToAimYaw(const FGameplayAbilityActorInfo* ActorInfo) const;
 
 	/** SnapToAimYaw + disable orient-to-movement so the snapped yaw holds while moving.
-	 *  Call from ActivateAbility after CommitAbility; pair with EndAimFacing in EndAbility. */
+	 *  Pair with EndAimFacing in EndAbility. Currently unused — the upper-body aim twist in
+	 *  UMAAnimInstance replaced whole-body facing; kept for future full-body-committed actions. */
 	void BeginAimFacing(const FGameplayAbilityActorInfo* ActorInfo) const;
 
 	/** Re-enable orient-to-movement disabled by BeginAimFacing. Safe on paths where
