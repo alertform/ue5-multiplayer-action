@@ -51,6 +51,22 @@ void AMultiPlayerActionCharacter::GiveDefaultAbilities()
 		return;
 	}
 
+	// Guard: default abilities + regen GE must only be granted once per ASC lifetime.
+	// The ASC lives on AMAPlayerState and survives pawn death/respawn; without this guard
+	// every RestartPlayer→PossessedBy re-grants every ability and stacks another
+	// Infinite Regen GE, doubling the regen rate on each death.
+	// Note: TargetDummy (BP_TargetDummy) is a separate class and does not call this
+	// function — it grants abilities directly in its own Blueprint — so there is no
+	// dummy-path concern here.
+	AMAPlayerState* PS = GetPlayerState<AMAPlayerState>();
+	if (PS)
+	{
+		if (PS->HasGrantedStartupAbilities())
+		{
+			return;
+		}
+	}
+
 	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DefaultAbilities)
 	{
 		if (AbilityClass)
@@ -69,6 +85,12 @@ void AMultiPlayerActionCharacter::GiveDefaultAbilities()
 		{
 			AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 		}
+	}
+
+	// Mark granted so subsequent PossessedBy calls (respawn) are no-ops for this path.
+	if (PS)
+	{
+		PS->MarkStartupAbilitiesGranted();
 	}
 }
 
