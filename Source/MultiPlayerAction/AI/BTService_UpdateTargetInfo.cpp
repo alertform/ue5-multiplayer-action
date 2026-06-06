@@ -4,6 +4,9 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystem/MAGameplayTags.h"
 
 UBTService_UpdateTargetInfo::UBTService_UpdateTargetInfo()
 {
@@ -27,6 +30,20 @@ void UBTService_UpdateTargetInfo::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 	if (!MyPawn) return;
 
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+
+	// Treat dead pawns as no target — the pawn persists briefly as a ragdoll during the
+	// death→respawn gap; without this check the AI chases a corpse.
+	if (PlayerPawn)
+	{
+		if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(PlayerPawn))
+		{
+			if (ASC->HasMatchingGameplayTag(MAGameplayTags::State_Dead))
+			{
+				PlayerPawn = nullptr;
+			}
+		}
+	}
+
 	BB->SetValueAsObject(TargetActorKey.SelectedKeyName, PlayerPawn);
 
 	bool bInRange = false;
