@@ -1,6 +1,8 @@
 #include "UI/MAUserWidget.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
+#include "Blueprint/WidgetTree.h"
+#include "UI/MASkillSlotWidget.h"
 
 void UMAUserWidget::InitFromASC(UAbilitySystemComponent* InASC)
 {
@@ -30,6 +32,18 @@ void UMAUserWidget::InitFromASC(UAbilitySystemComponent* InASC)
 	OnHealthChanged(Health, Health);
 	OnStaminaChanged(Stamina, Stamina);
 	OnAttackPowerChanged(AttackPower, AttackPower);
+
+	// Auto-wire any skill slots placed in the BP child's tree — WBP_HUD just lays them out.
+	if (WidgetTree)
+	{
+		WidgetTree->ForEachWidget([InASC](UWidget* W)
+		{
+			if (UMASkillSlotWidget* SkillSlot = Cast<UMASkillSlotWidget>(W))
+			{
+				SkillSlot->InitSlot(InASC);
+			}
+		});
+	}
 }
 
 void UMAUserWidget::HandleHealthChange(const FOnAttributeChangeData& Data)
