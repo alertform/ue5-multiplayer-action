@@ -2,6 +2,12 @@
 
 Lyra-style PvE melee combat demo built on Unreal Engine 5.5 — full **Gameplay Ability System** (GAS) stack, multiplayer replication, AI driven by **BehaviorTree** sharing the same `GameplayAbility` C++ classes as the player. Personal portfolio project.
 
+> Built alongside (and largely *with*) **[UnrealAgentMCP](https://github.com/alertform/UnrealAgentMCP)** — a self-developed in-editor MCP server (57 tools / 55 automation tests) that lets an AI agent author Blueprints, UMG, AnimGraphs, BehaviorTrees and level content directly inside the running editor. Most of this project's content-side work (montages, GE configs, widget trees, BT nodes, AnimGraph layering, arena dressing) was authored agent-side through it. The plugin lives in [`Plugins/UnrealAgentMCP`](Plugins/UnrealAgentMCP/) and has its own standalone repo.
+
+| | |
+|---|---|
+| ![Arena vista](docs/screenshots/arena_vista.png) | ![Arena rocks](docs/screenshots/arena_rocks.png) |
+
 ---
 
 ## Highlights
@@ -11,8 +17,10 @@ Lyra-style PvE melee combat demo built on Unreal Engine 5.5 — full **Gameplay 
 | **GAS 5 pillars** | `GameplayAbility` (LocalPredicted ×4: Melee / Sprint / Dodge / Fireball) · `GameplayEffect` (Damage Execution / Cooldown / Stamina Cost / Periodic Stamina Regen) · `AttributeSet` (Health/MaxHealth/Stamina/AttackPower/Armor + Damage meta) · `GameplayCue` (`Static` notify w/ `FHitResult` location/normal + data-driven C++ burst cue base) · `PredictionKey` |
 | **Projectile netcode** | Lyra/GASShooter-style ranged AoE: predicted cast montage (instant client feedback) + **server-only spawn** of a replicated `AMAProjectile` carrying a damage spec **snapshotted at cast time** — the fireball lands with cast-time stats even if the caster dies mid-flight. AoE overlap applies the same ExecCalc to every ASC in radius; explosion FX replicate via GameplayCue. |
 | **Damage formula** | `UGameplayEffectExecutionCalculation` capturing source `AttackPower` (snapshot) + target `Armor` (live), output to `Damage` meta-attribute, AS routes to `Health`. Lyra `ULyraDamageExecution` pattern. |
-| **HUD architecture** | `UMAUserWidget` abstract C++ base self-binds to `ASC->GetGameplayAttributeValueChangeDelegate`. BP children handle visuals only. Same widget base reused for player HUD + enemy floating health bar. |
-| **AI** | `BehaviorTree` + custom `UBTService_UpdateTargetInfo` (per-tick player tracking) + custom `UBTTask_TryActivateAbilityByTag` (BT node → `ASC.TryActivateAbilitiesByTag`). AI calls the **same `UGA_MeleeAttack` C++ class** the player drives via Enhanced Input. |
+| **HUD architecture** | Self-contained C++ Views auto-wired by `UMAUserWidget::InitFromASC` tree scan: `UMAHealthBarWidget` (Street-Fighter-style **chip damage bar** — front fill drops instantly, a chip segment accumulates hits for 3 s then drains; styles force-built in `NativePreConstruct`) and `UMASkillSlotWidget` (cooldown sweep from active cooldown GE query + active-tag highlight). The **same chip-bar widget** doubles as the NPC overhead bar (`bHideUntilDamaged` — appears on first blood, re-hides at full). |
+| **Animation** | Upper-body layering rig in `ABP_Manny` (cached full pose → `UpperBody` slot → layered blend per bone on `spine_01`) keeps the legs running while attack/cast montages play. `UMAAnimInstance` adds a **torso aim twist**: while `State.Attacking`/`State.Casting` is on the ASC, the spine chain rotates toward the camera yaw (clamped ±90°, interp-smoothed) — legs keep orient-to-movement, body language follows the crosshair. |
+| **AI** | `BehaviorTree` + custom `UBTService_UpdateTargetInfo` (nearest **living** player, preferring **NavMesh-reachable** targets over closer unreachable ones) + custom `UBTTask_TryActivateAbilityByTag` (BT node → `ASC.TryActivateAbilitiesByTag`). AI calls the **same `UGA_MeleeAttack` C++ class** the player drives via Enhanced Input. |
+| **Session front-end** | `UMASessionSubsystem` (GameInstance subsystem over the OnlineSubsystem session interface) with a UMG **MVVM** main menu — `UMAMainMenuViewModel` + FieldNotify bindings, ListView of discovered sessions, host/join/refresh with in-flight guards and network-failure recovery back to the menu. |
 | **Networking** | Server-authoritative damage; `Mixed` ASC replication for players (cooldown to owner) + `Minimal` for NPCs. `NetMulticast` RPC for ragdoll (component state doesn't auto-replicate). `Server` RPC for dev cheats. |
 | **Death/Respawn** | `IMACombatantInterface` abstraction; `State.Dead` loose tag gates re-activation; `UnPossess()` before `GameMode->RestartPlayer()` to force fresh pawn spawn (vs the engine's default teleport-existing). |
 
@@ -78,11 +86,14 @@ Player input (Q) → ASC.TryActivateAbilitiesByTag(Ability.Ranged.Fireball)
      ↓
 UGA_Fireball::ActivateAbility (LocalPredicted — cast starts INSTANTLY on the owning client)
      ↓
-CommitAbility (Stamina -20 + 3s cooldown) · snap to aim yaw · root caster for the cast
+CommitAbility (Stamina -20 + 3s cooldown) · MOBILE cast — montage on the UpperBody slot,
+     legs keep running; torso aim-twists toward the camera (UMAAnimInstance, State.Casting)
      ↓
-PlayMontageAndWait(AM_FireballCast) + WaitGameplayEvent(Event.Montage.SpawnProjectile)
+PlayMontageAndWait(AM_FireballCastUB) + WaitGameplayEvent(Event.Montage.SpawnProjectile)
      ↓ (release-frame AnimNotify, ~1.65s — windup masks the projectile's replication latency)
 SERVER ONLY: snapshot damage spec (source AttackPower captured NOW)
+     ↓
+Aim = camera-ray impact point (heights work; ground shots are intentional AoE placement)
      ↓
 SpawnActorDeferred<AMAProjectile> (bReplicates + movement replication) → InitProjectile(spec, radius)
      ↓
@@ -141,26 +152,35 @@ Source/MultiPlayerAction/
 ├── Player/
 │   ├── MAPlayerState.{h,cpp}              Owns ASC + AttributeSet
 │   └── MAPlayerController.{h,cpp}         Spawns + binds HUD widget; ScheduleRespawn timer; DamageSelf Server RPC
+├── Online/
+│   └── MASessionSubsystem.{h,cpp}         GameInstance subsystem over OnlineSubsystem sessions (host/find/join,
+│                                          in-flight guards, network-failure recovery to the menu)
+├── Animation/
+│   └── MAAnimInstance.{h,cpp}             Torso aim twist: spine-chain yaw toward camera, gated on State tags
 ├── UI/
-│   └── MAUserWidget.{h,cpp}               Abstract HUD widget base, self-binds to ASC delegates
+│   ├── MAUserWidget.{h,cpp}               Abstract HUD widget base; auto-wires child Views in its tree
+│   ├── MAHealthBarWidget.{h,cpp}          SF-style chip health bar (code-built rounded styles, hide-until-damaged mode)
+│   ├── MASkillSlotWidget.{h,cpp}          Skill slot: cooldown sweep + active highlight + ability/hotkey label stack
+│   └── MainMenu/                          MVVM front-end: MAMainMenuViewModel/Widget, MASessionListEntryVM/RowWidget
 └── AI/
-    ├── MATargetDummy.{h,cpp}              Pawn-owned ASC (Minimal rep), AI possess, floating health bar component
+    ├── MATargetDummy.{h,cpp}              Pawn-owned ASC (Minimal rep), AI possess, overhead chip-bar component
     ├── MAEnemyController.{h,cpp}          AAIController + RunBehaviorTree on possess
     ├── BTTask_TryActivateAbilityByTag.{h,cpp}    BT task: ASC.TryActivateAbilitiesByTag(AbilityTag)
-    └── BTService_UpdateTargetInfo.{h,cpp}        BT service: per-tick player + range update to BB
+    └── BTService_UpdateTargetInfo.{h,cpp}        BT service: nearest living player, reachability-preferred
 ```
 
 Content (BP / assets) under `Content/`:
 - `AbilitySystem/Abilities/` — `BP_GA_MeleeAttack`, `BP_GA_Sprint`, `BP_GA_Dodge`, `BP_GA_Fireball`
-- `AbilitySystem/GE/` — `BP_GE_Damage` (uses `MADamageExecutionCalculation`), `BP_GE_Cooldown_Melee`/`_Fireball`, `BP_GE_StaminaCost`/`_Fireball`, `BP_GE_StaminaRegen` (Periodic, OngoingTagRequirements suppresses during sprint)
+- `AbilitySystem/GE/` — `BP_GE_Damage` (uses `MADamageExecutionCalculation`), `BP_GE_Cooldown_Melee`/`_Dodge`/`_Fireball`, `BP_GE_StaminaCost`/`_Fireball`, `BP_GE_StaminaRegen` (Periodic, OngoingTagRequirements suppresses during sprint)
 - `AbilitySystem/Cues/` — `BP_GCN_MeleeHit` (`GameplayCueNotify_Static`, P_Sparks at `FHitResult.ImpactPoint`), `BP_GCN_FireballExplosion` (`GCN_ParticleBurst` child — pure data, no graph)
-- `AbilitySystem/AM_Montage/` — `AM_MeleeAttack`, `AM_FireballCast` (cropped from a Mage bundle volley + release-frame `AN_SendGameplayEvent`)
+- `AbilitySystem/AM_Montage/` — `AM_MeleeStrikeUB`, `AM_FireballCastUB` (UpperBody-slot montages cropped from a Mage bundle + release-frame `AN_SendGameplayEvent`)
+- `Characters/Mannequins/Animations/ABP_Manny` — upper-body layered blend rig + spine aim-twist chain (authored node-by-node via MCP AnimGraph tools)
 - `Blueprints/Combat/` — `BP_Projectile_Fireball` (visuals on top of `AMAProjectile`)
 - `Blueprints/AI/` — `BP_TargetDummy`, `BP_EnemyController`
 - `AI/` — `BB_Enemy` (Blackboard), `BT_Enemy` (BehaviorTree)
-- `UI/` — `WBP_HUD` (player), `WBP_EnemyHealthBar` (NPC)
+- `Blueprints/UI/` — `WBP_HUD` (chip health bar + skill bar), `WBP_SkillSlot`, `WBP_MainMenu` (MVVM); `UI/` — `WBP_HealthBar` (shared player/NPC chip bar), `WBP_MASessionRowWidget`
 
-> Most of the fireball content above was authored **agent-side via [UnrealAgentMCP](Plugins/UnrealAgentMCP/)** — the in-editor MCP server developed alongside this project (montage creation/cropping, AnimNotify placement, GE configuration, skeleton compatibility registration all happened through MCP tools, several of which were built for exactly this feature).
+> The bulk of the content above was authored **agent-side via [UnrealAgentMCP](Plugins/UnrealAgentMCP/)**: montage creation/cropping, AnimNotify placement, GE configuration, BehaviorTree nodes, UMG widget trees + MVVM bindings, AnimGraph surgery (cached-pose/slot/layered-blend/ModifyBone chains) and the arena dressing all happened through MCP tools — several of which were built (with save/reload regression tests) precisely because this project needed them. That dogfooding loop is the second half of the portfolio: see the [plugin README](Plugins/UnrealAgentMCP/README.md).
 
 ---
 
@@ -187,7 +207,7 @@ Or via UBT externally:
   -Project="<absolute-path>/MultiPlayerAction.uproject" -WaitMutex
 ```
 
-PIE: open `Content/Maps/ThirdPersonMap`, set Number of Players ≥ 2 to exercise multiplayer replication (or start from `Maps/MainMenu` and Host/Join through the session front-end). **LMB** melee, **Q** fireball (predicted cast → server projectile → AoE), **Shift** sprint, **Ctrl** dodge i-frame. Walk near the `BP_TargetDummy` placed in the map — it will rotate + attack via BT. Console `DamageSelf 100` self-damages (Server RPC) to test ragdoll + respawn. Acceptance was also run at 100ms emulated latency (PIE Network Emulation).
+PIE: open `Content/Maps/ThirdPersonMap`, set Number of Players ≥ 2 to exercise multiplayer replication (or start from `Maps/MainMenu` and Host/Join through the session front-end). **LMB** melee, **Q** fireball (mobile upper-body cast, projectile flies at the camera-ray aim point), **Shift** sprint, **Ctrl** dodge i-frame — all four on the HUD skill bar with cooldown sweeps. Walk near the `BP_TargetDummy` placed in the map — it chases (NavMesh, reachability-aware targeting) and attacks via BT; its overhead chip bar appears on first blood. Console `DamageSelf 100` self-damages (Server RPC) to test ragdoll + respawn. Acceptance was also run at 100ms emulated latency (PIE Network Emulation).
 
 ---
 
