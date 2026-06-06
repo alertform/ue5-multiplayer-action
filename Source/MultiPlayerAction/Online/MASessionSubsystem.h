@@ -83,6 +83,11 @@ private:
 	FDelegateHandle DestroySessionHandle;
 	FDelegateHandle StaleDestroyHandle;
 
+	/** Covers the whole async lifecycle of host/join, incl. the stale-destroy detour.
+	 *  Set at the start of HostSession/JoinSessionByIndex (after param validation),
+	 *  cleared at every terminal exit (success, failure, sync early-out). */
+	bool bOperationInFlight = false;
+
 	/** Host/Join request parked while an async destroy of a stale session is in flight. */
 	int32 PendingHostConnections = INDEX_NONE;
 	int32 PendingJoinIndex = INDEX_NONE;

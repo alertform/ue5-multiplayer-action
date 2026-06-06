@@ -33,10 +33,22 @@ void UMASessionSubsystem::HostSession(int32 NumPublicConnections, const FString&
 		return;
 	}
 
+	// In-flight guard: covers the entire async host lifecycle including the stale-destroy
+	// detour. Without this, a second HostSession call before the first completes would
+	// overwrite CreateSessionHandle/StaleDestroyHandle and could fire double ServerTravel.
+	if (bOperationInFlight)
+	{
+		UE_LOG(LogNet, Warning, TEXT("UMASessionSubsystem::HostSession refused: operation already in flight"));
+		OnHostSessionComplete.Broadcast(false);
+		return;
+	}
+	bOperationInFlight = true;
+
 	// Re-entrancy guard: a stale-session destroy is already in flight (rapid double click) —
 	// a second request would orphan StaleDestroyHandle and double-fire the chain (gate review).
 	if (PendingHostConnections != INDEX_NONE || PendingJoinIndex != INDEX_NONE)
 	{
+		bOperationInFlight = false;
 		OnHostSessionComplete.Broadcast(false);
 		return;
 	}
@@ -44,6 +56,7 @@ void UMASessionSubsystem::HostSession(int32 NumPublicConnections, const FString&
 	IOnlineSessionPtr Sessions = GetSessionInterface();
 	if (!Sessions.IsValid())
 	{
+		bOperationInFlight = false;
 		OnHostSessionComplete.Broadcast(false);
 		return;
 	}
@@ -63,6 +76,7 @@ void UMASessionSubsystem::HostSession(int32 NumPublicConnections, const FString&
 		{
 			Sessions->ClearOnDestroySessionCompleteDelegate_Handle(StaleDestroyHandle);
 			PendingHostConnections = INDEX_NONE;
+			bOperationInFlight = false;
 			OnHostSessionComplete.Broadcast(false);
 		}
 		return;
@@ -76,6 +90,7 @@ void UMASessionSubsystem::StartCreateSession(int32 NumPublicConnections)
 	IOnlineSessionPtr Sessions = GetSessionInterface();
 	if (!Sessions.IsValid())
 	{
+		bOperationInFlight = false;
 		OnHostSessionComplete.Broadcast(false);
 		return;
 	}
@@ -97,6 +112,7 @@ void UMASessionSubsystem::StartCreateSession(int32 NumPublicConnections)
 	if (!LP || !Sessions->CreateSession(*LP->GetPreferredUniqueNetId(), SessionName, Settings))
 	{
 		Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionHandle);
+		bOperationInFlight = false;
 		OnHostSessionComplete.Broadcast(false);
 	}
 }
@@ -115,6 +131,7 @@ void UMASessionSubsystem::HandleStaleSessionDestroyed(FName InSessionName, bool 
 
 	if (!bWasSuccessful)
 	{
+		bOperationInFlight = false;
 		if (HostConnections != INDEX_NONE) { OnHostSessionComplete.Broadcast(false); }
 		if (JoinIndex != INDEX_NONE)       { OnJoinSessionComplete.Broadcast(false); }
 		return;
@@ -137,6 +154,7 @@ void UMASessionSubsystem::HandleCreateSessionComplete(FName InSessionName, bool 
 		Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionHandle);
 	}
 
+	bOperationInFlight = false;
 	OnHostSessionComplete.Broadcast(bWasSuccessful);
 
 	if (bWasSuccessful && !PendingTravelURL.IsEmpty())
@@ -202,9 +220,21 @@ void UMASessionSubsystem::HandleFindSessionsComplete(bool bWasSuccessful)
 
 void UMASessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 {
+	// In-flight guard: covers the entire async join lifecycle including the stale-destroy
+	// detour. Without this, a second JoinSession call before the first completes would
+	// overwrite JoinSessionHandle/StaleDestroyHandle and could double-fire ClientTravel.
+	if (bOperationInFlight)
+	{
+		UE_LOG(LogNet, Warning, TEXT("UMASessionSubsystem::JoinSessionByIndex refused: operation already in flight"));
+		OnJoinSessionComplete.Broadcast(false);
+		return;
+	}
+	bOperationInFlight = true;
+
 	// Re-entrancy guard — see HostSession.
 	if (PendingHostConnections != INDEX_NONE || PendingJoinIndex != INDEX_NONE)
 	{
+		bOperationInFlight = false;
 		OnJoinSessionComplete.Broadcast(false);
 		return;
 	}
@@ -213,6 +243,7 @@ void UMASessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 	if (!Sessions.IsValid() || !SearchSettings.IsValid() ||
 		!SearchSettings->SearchResults.IsValidIndex(SessionIndex))
 	{
+		bOperationInFlight = false;
 		OnJoinSessionComplete.Broadcast(false);
 		return;
 	}
@@ -233,6 +264,7 @@ void UMASessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 		{
 			Sessions->ClearOnDestroySessionCompleteDelegate_Handle(StaleDestroyHandle);
 			PendingJoinIndex = INDEX_NONE;
+			bOperationInFlight = false;
 			OnJoinSessionComplete.Broadcast(false);
 		}
 		return;
@@ -247,6 +279,7 @@ void UMASessionSubsystem::StartJoinSession(int32 SessionIndex)
 	if (!Sessions.IsValid() || !SearchSettings.IsValid() ||
 		!SearchSettings->SearchResults.IsValidIndex(SessionIndex))
 	{
+		bOperationInFlight = false;
 		OnJoinSessionComplete.Broadcast(false);
 		return;
 	}
@@ -259,6 +292,7 @@ void UMASessionSubsystem::StartJoinSession(int32 SessionIndex)
 		SearchSettings->SearchResults[SessionIndex]))
 	{
 		Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionHandle);
+		bOperationInFlight = false;
 		OnJoinSessionComplete.Broadcast(false);
 	}
 }
@@ -271,6 +305,7 @@ void UMASessionSubsystem::HandleJoinSessionComplete(FName InSessionName, EOnJoin
 		Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionHandle);
 	}
 
+	bOperationInFlight = false;
 	const bool bSuccess = (Result == EOnJoinSessionCompleteResult::Success);
 	OnJoinSessionComplete.Broadcast(bSuccess);
 
