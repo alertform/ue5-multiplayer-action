@@ -17,16 +17,27 @@ AMultiPlayerActionCharacter* UMAGameplayAbilityBase::GetMACharacter(const FGamep
 	return ActorInfo ? Cast<AMultiPlayerActionCharacter>(ActorInfo->AvatarActor.Get()) : nullptr;
 }
 
-void UMAGameplayAbilityBase::BeginRootedAction(const FGameplayAbilityActorInfo* ActorInfo) const
+void UMAGameplayAbilityBase::SnapToAimYaw(const FGameplayAbilityActorInfo* ActorInfo) const
 {
-	// Demo feedback fixes: snap the character to the aim direction so the action animation,
-	// the projectile, and the camera agree; and root the avatar for the action's duration.
-	// Runs on both the predicting client and the server — rotation/movement-mode replicate.
+	// Snap the character to the camera's yaw so the action animation fires where the player
+	// is looking (orient-to-movement would otherwise leave the body facing the last move
+	// direction). Runs on both the predicting client and the server — rotation replicates.
 	if (ACharacter* AvatarCharacter = Cast<ACharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr))
 	{
 		const FRotator AimYaw(0.f, AvatarCharacter->GetBaseAimRotation().Yaw, 0.f);
 		AvatarCharacter->SetActorRotation(AimYaw);
+	}
+}
 
+void UMAGameplayAbilityBase::BeginRootedAction(const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	// Aim-snap + root the avatar for the action's duration (movement-mode replicates).
+	// Currently unused — both melee and fireball moved to upper-body layering + SnapToAimYaw;
+	// kept for future committed/channelled actions.
+	SnapToAimYaw(ActorInfo);
+
+	if (ACharacter* AvatarCharacter = Cast<ACharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr))
+	{
 		if (UCharacterMovementComponent* MoveComp = AvatarCharacter->GetCharacterMovement())
 		{
 			MoveComp->DisableMovement();

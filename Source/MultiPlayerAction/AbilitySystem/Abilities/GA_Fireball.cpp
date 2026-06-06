@@ -56,7 +56,9 @@ void UGA_Fireball::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	BeginRootedAction(ActorInfo);
+	// Mobile cast: upper-body layering keeps the legs running; only snap to the camera yaw
+	// so the cast visual starts where the player is looking.
+	SnapToAimYaw(ActorInfo);
 
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 		this, NAME_None, CastMontage, MontagePlayRate);
@@ -113,11 +115,27 @@ void UGA_Fireball::SpawnProjectile(const FGameplayAbilityActorInfo* ActorInfo)
 		}
 	}
 
-	// BaseAimRotation: ControlRotation for players, focal rotation for AI — one code path serves both.
-	// Yaw only: the third-person camera carries a slight downward pitch, which would slam the bolt
-	// into the ground a few meters out. No crosshair in this game — horizontal flight reads best.
-	const FRotator SpawnRotation(0.f,
+	// Aim at what the camera is looking at: trace from the camera through screen center and fly
+	// toward the impact point — handles height differences (target on a platform) naturally, and
+	// aiming at the ground is now an intentional AoE ground-shot. Falls back to horizontal yaw
+	// when there is no player controller (AI) or the trace hits nothing within range.
+	FRotator SpawnRotation(0.f,
 		AvatarPawn ? AvatarPawn->GetBaseAimRotation().Yaw : Avatar->GetActorRotation().Yaw, 0.f);
+	if (const APlayerController* PC = AvatarPawn ? Cast<APlayerController>(AvatarPawn->GetController()) : nullptr)
+	{
+		FVector CamLoc;
+		FRotator CamRot;
+		PC->GetPlayerViewPoint(CamLoc, CamRot);
+
+		FCollisionQueryParams AimParams;
+		AimParams.AddIgnoredActor(Avatar);
+		FHitResult AimHit;
+		const FVector TraceEnd = CamLoc + CamRot.Vector() * 10000.f;
+		const FVector AimPoint = Avatar->GetWorld()->LineTraceSingleByChannel(
+			AimHit, CamLoc, TraceEnd, ECC_Visibility, AimParams)
+			? AimHit.ImpactPoint : TraceEnd;
+		SpawnRotation = (AimPoint - SpawnLocation).GetSafeNormal().Rotation();
+	}
 
 	// Snapshot the damage spec NOW — ExecCalc captures source AttackPower at spec-creation time,
 	// so the fireball lands with cast-time stats even if the caster dies mid-flight.
@@ -138,12 +156,3 @@ void UGA_Fireball::SpawnProjectile(const FGameplayAbilityActorInfo* ActorInfo)
 	Projectile->FinishSpawning(SpawnTransform);
 }
 
-void UGA_Fireball::EndAbility(const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	bool bReplicateEndAbility, bool bWasCancelled)
-{
-	EndRootedAction(ActorInfo);
-
-	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
-}

@@ -24,9 +24,13 @@ protected:
 	/** Get the avatar actor cast to our character class */
 	class AMultiPlayerActionCharacter* GetMACharacter(const FGameplayAbilityActorInfo* ActorInfo) const;
 
-	/** Snap the avatar to its aim yaw and root it (MOVE_None) for the action's duration.
-	 *  Call from ActivateAbility after CommitAbility; pair with EndRootedAction in EndAbility.
-	 *  Runs on both the predicting client and the server — rotation/movement-mode replicate. */
+	/** Snap the avatar to the camera's yaw so the action fires where the player is looking.
+	 *  Call from ActivateAbility after CommitAbility. Runs on predicting client + server. */
+	void SnapToAimYaw(const FGameplayAbilityActorInfo* ActorInfo) const;
+
+	/** SnapToAimYaw + root (MOVE_None) for the action's duration; pair with EndRootedAction
+	 *  in EndAbility. Currently unused (upper-body layering replaced rooting) — kept for
+	 *  future committed/channelled actions. */
 	void BeginRootedAction(const FGameplayAbilityActorInfo* ActorInfo) const;
 
 	/** Restore MOVE_Walking, but only if still MOVE_None — death ragdoll etc. must not be stomped. */

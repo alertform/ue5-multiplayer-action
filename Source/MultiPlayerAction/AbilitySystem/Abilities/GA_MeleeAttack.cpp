@@ -40,6 +40,10 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
+	// Face the camera direction for the swing — feels natural and keeps the forward-vector
+	// hit trace aligned with where the player is actually aiming.
+	SnapToAimYaw(ActorInfo);
+
 	// Play montage at configurable rate (default 2.0x — see MontagePlayRate UPROPERTY)
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 		this, NAME_None, AttackMontage, MontagePlayRate);
