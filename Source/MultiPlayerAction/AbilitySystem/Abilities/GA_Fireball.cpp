@@ -27,6 +27,11 @@ UGA_Fireball::UGA_Fireball()
 	// blocked for the duration: LaunchCharacter is silently swallowed under MOVE_None, and a
 	// melee montage interrupt would waste the already-committed fireball cost + cooldown.
 	ActivationOwnedTags.AddTag(MAGameplayTags::State_Casting);
+	// Symmetric block: starting a fireball mid-melee-swing would interrupt the melee montage,
+	// whose EndAbility restore (MOVE_None guard) would stomp the fireball's fresh root —
+	// unrooted sliding cast. Blocked tags are checked before our own owned tag applies,
+	// so this does NOT deadlock self-activation.
+	ActivationBlockedTags.AddTag(MAGameplayTags::State_Casting);
 }
 
 void UGA_Fireball::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
