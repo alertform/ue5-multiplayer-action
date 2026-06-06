@@ -451,6 +451,14 @@ void UMASessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 
 void UMASessionSubsystem::HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString)
 {
+	// Mirror HandleNetworkFailure's NM_Client guard: server-side travel failures (bad map URL,
+	// missing package on the host) must not push the listen server to the main menu via
+	// ClientTravel while connected clients still depend on it (review finding).
+	if (!World || World->GetNetMode() != NM_Client)
+	{
+		return;
+	}
+
 	UE_LOG(LogNet, Warning,
 		TEXT("UMASessionSubsystem::HandleTravelFailure: type=%s error='%s' — tearing down session and returning to main menu"),
 		ETravelFailure::ToString(FailureType), *ErrorString);
@@ -460,7 +468,8 @@ void UMASessionSubsystem::HandleTravelFailure(UWorld* World, ETravelFailure::Typ
 	PendingHostConnections = INDEX_NONE;
 	PendingJoinIndex = INDEX_NONE;
 
-	// Tear down any stale named session.
+	// Tear down any stale named session. Fire-and-forget destroy is fine for the NULL OSS
+	// (synchronous in practice); revisit with a completion callback if this ever moves to Steam/EOS.
 	if (IOnlineSessionPtr Sessions = GetSessionInterface())
 	{
 		if (Sessions->GetNamedSession(SessionName))

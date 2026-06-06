@@ -76,6 +76,12 @@ void AMultiPlayerActionCharacter::GiveDefaultAbilities()
 	}
 
 	// Apply Stamina regen once on possess; Periodic Infinite GE auto-loops
+	if (!StaminaRegenEffect)
+	{
+		// The grant-once flag below is set regardless — a null StaminaRegenEffect means regen
+		// stays permanently absent for this PlayerState. Surface the misconfiguration loudly.
+		UE_LOG(LogTemp, Warning, TEXT("%s: StaminaRegenEffect is not set in BP defaults — stamina will never regenerate."), *GetNameSafe(this));
+	}
 	if (StaminaRegenEffect)
 	{
 		FGameplayEffectContextHandle Ctx = AbilitySystemComponent->MakeEffectContext();
