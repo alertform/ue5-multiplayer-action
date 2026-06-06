@@ -3,6 +3,7 @@
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
 #include "AbilitySystem/MAGameplayTags.h"
+#include "UI/MAHealthBarWidget.h"
 #include "UI/MAUserWidget.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
@@ -85,7 +86,13 @@ void AMATargetDummy::BeginPlay()
 	// — widget instance lives in viewport, ASC replicates, attribute change delegate fires.
 	if (HealthBarWidget)
 	{
-		if (UMAUserWidget* Widget = Cast<UMAUserWidget>(HealthBarWidget->GetUserWidgetObject()))
+		if (UMAHealthBarWidget* ChipBar = Cast<UMAHealthBarWidget>(HealthBarWidget->GetUserWidgetObject()))
+		{
+			// Overhead chip bar (same widget as the HUD): invisible until first damage.
+			ChipBar->SetHideUntilDamaged(true);
+			ChipBar->InitHealthBar(AbilitySystemComponent);
+		}
+		else if (UMAUserWidget* Widget = Cast<UMAUserWidget>(HealthBarWidget->GetUserWidgetObject()))
 		{
 			Widget->InitFromASC(AbilitySystemComponent);
 		}

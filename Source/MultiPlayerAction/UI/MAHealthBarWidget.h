@@ -27,7 +27,12 @@ public:
 	/** Bind to the ASC's Health/MaxHealth. Idempotent — safe on respawn re-init. */
 	void InitHealthBar(UAbilitySystemComponent* InASC);
 
+	/** Overhead-bar mode: stay collapsed until the first damage, re-hide when back at full.
+	 *  Call BEFORE InitHealthBar (e.g. AMATargetDummy::BeginPlay). */
+	void SetHideUntilDamaged(bool bInHide) { bHideUntilDamaged = bInHide; }
+
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	/** Front bar — real health, updates instantly. */
@@ -46,6 +51,35 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Chip", meta = (ClampMin = "0.01", UIMax = "5.0"))
 	float ChipDrainPerSecond = 0.6f;
 
+	// --- Style (built in C++ at PreConstruct so designer-time template state can never
+	// --- leak a default Slate look into runtime instances) ---
+
+	/** Front fill — current health */
+	UPROPERTY(EditAnywhere, Category = "Style")
+	FLinearColor HealthColor = FLinearColor(0.85f, 0.07f, 0.06f, 1.0f);
+
+	/** Chip fill — recent damage */
+	UPROPERTY(EditAnywhere, Category = "Style")
+	FLinearColor ChipColor = FLinearColor(0.35f, 0.03f, 0.03f, 0.95f);
+
+	/** Bar track behind everything (warm near-black) */
+	UPROPERTY(EditAnywhere, Category = "Style")
+	FLinearColor TrackColor = FLinearColor(0.02f, 0.016f, 0.012f, 0.85f);
+
+	/** Rounded-box outline accent */
+	UPROPERTY(EditAnywhere, Category = "Style")
+	FLinearColor OutlineColor = FLinearColor(1.0f, 0.78f, 0.35f, 0.45f);
+
+	UPROPERTY(EditAnywhere, Category = "Style", meta = (ClampMin = "0.0", UIMax = "20.0"))
+	float CornerRadius = 9.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Style", meta = (ClampMin = "0.0", UIMax = "4.0"))
+	float OutlineWidth = 1.5f;
+
+	/** Overhead-bar mode (see SetHideUntilDamaged) */
+	UPROPERTY(EditAnywhere, Category = "Style")
+	bool bHideUntilDamaged = false;
+
 private:
 	TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
 	bool bBound = false;
@@ -61,4 +95,7 @@ private:
 	void ApplyHealth(float NewHealth, float OldHealth);
 	float GetMaxHealthSafe() const;
 	void PushToBars() const;
+
+	/** Force-build the rounded-box styles on both ProgressBars from the color properties. */
+	void ApplyBarStyles();
 };

@@ -41,8 +41,16 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "SkillSlot")
 	FText HotkeyText;
 
+	/** Ability display name shown above the hotkey, e.g. "Attack". */
+	UPROPERTY(EditAnywhere, Category = "SkillSlot")
+	FText AbilityNameText;
+
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> HotkeyLabel;
+
+	/** Top line of the label stack; optional so older layouts without it still bind. */
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> AbilityLabel;
 
 	/** Bottom-to-top fill; percent = remaining/duration so the mask recedes as the CD runs out. */
 	UPROPERTY(meta = (BindWidget))

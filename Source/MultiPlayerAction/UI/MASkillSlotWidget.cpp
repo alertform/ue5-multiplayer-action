@@ -4,8 +4,10 @@
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 
-const FLinearColor UMASkillSlotWidget::IdleColor(0.02f, 0.02f, 0.025f, 0.85f);
-const FLinearColor UMASkillSlotWidget::ActiveColor(1.0f, 0.78f, 0.35f, 0.95f);
+// Borderless slots: idle is fully transparent (no per-ability frame); the rounded SlotBorder
+// only appears as a soft amber pill behind the labels while the ability is active.
+const FLinearColor UMASkillSlotWidget::IdleColor(0.f, 0.f, 0.f, 0.f);
+const FLinearColor UMASkillSlotWidget::ActiveColor(1.0f, 0.78f, 0.35f, 0.55f);
 
 void UMASkillSlotWidget::InitSlot(UAbilitySystemComponent* InASC)
 {
@@ -21,6 +23,10 @@ void UMASkillSlotWidget::NativePreConstruct()
 	if (HotkeyLabel)
 	{
 		HotkeyLabel->SetText(HotkeyText);
+	}
+	if (AbilityLabel)
+	{
+		AbilityLabel->SetText(AbilityNameText);
 	}
 	if (CooldownOverlay)
 	{
