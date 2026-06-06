@@ -2,9 +2,45 @@
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
+#include "Engine/GameInstance.h"
 
 UMASessionSubsystem::UMASessionSubsystem() = default;
+
+// ---------- Subsystem lifecycle ----------
+
+void UMASessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+
+	if (GEngine)
+	{
+		NetworkFailureHandle = GEngine->OnNetworkFailure().AddUObject(this, &ThisClass::HandleNetworkFailure);
+		TravelFailureHandle  = GEngine->OnTravelFailure().AddUObject(this, &ThisClass::HandleTravelFailure);
+	}
+}
+
+void UMASessionSubsystem::Deinitialize()
+{
+	if (GEngine)
+	{
+		GEngine->OnNetworkFailure().Remove(NetworkFailureHandle);
+		GEngine->OnTravelFailure().Remove(TravelFailureHandle);
+	}
+
+	// Clear any dangling OSS delegate handles so the OSS doesn't fire into a dead object.
+	if (IOnlineSessionPtr Sessions = GetSessionInterface())
+	{
+		Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionHandle);
+		Sessions->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsHandle);
+		Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionHandle);
+		Sessions->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionHandle);
+		Sessions->ClearOnDestroySessionCompleteDelegate_Handle(StaleDestroyHandle);
+	}
+
+	Super::Deinitialize();
+}
 
 IOnlineSessionPtr UMASessionSubsystem::GetSessionInterface() const
 {
@@ -375,4 +411,67 @@ FString UMASessionSubsystem::BuildNameOption() const
 	return DesiredPlayerName.IsEmpty()
 		? FString()
 		: FString::Printf(TEXT("?Name=%s"), *DesiredPlayerName);
+}
+
+// ---------- Failure recovery ----------
+
+void UMASessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
+{
+	// Only act on client disconnects — the listen server itself should not travel away.
+	if (!World || World->GetNetMode() != NM_Client)
+	{
+		return;
+	}
+
+	UE_LOG(LogNet, Warning,
+		TEXT("UMASessionSubsystem::HandleNetworkFailure: type=%s error='%s' — tearing down session and returning to main menu"),
+		ENetworkFailure::ToString(FailureType), *ErrorString);
+
+	// Reset in-flight state so the subsystem can be reused on the next menu session.
+	bOperationInFlight = false;
+	PendingHostConnections = INDEX_NONE;
+	PendingJoinIndex = INDEX_NONE;
+
+	// Tear down the stale named session so a subsequent Host/Join doesn't hit the
+	// stale-session destroy path with a zombie handle.
+	if (IOnlineSessionPtr Sessions = GetSessionInterface())
+	{
+		if (Sessions->GetNamedSession(SessionName))
+		{
+			Sessions->DestroySession(SessionName);
+		}
+	}
+
+	// /Game/Maps/MainMenu matches GameDefaultMap in DefaultEngine.ini
+	if (APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController())
+	{
+		PC->ClientTravel(TEXT("/Game/Maps/MainMenu"), TRAVEL_Absolute);
+	}
+}
+
+void UMASessionSubsystem::HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString)
+{
+	UE_LOG(LogNet, Warning,
+		TEXT("UMASessionSubsystem::HandleTravelFailure: type=%s error='%s' — tearing down session and returning to main menu"),
+		ETravelFailure::ToString(FailureType), *ErrorString);
+
+	// Reset in-flight state.
+	bOperationInFlight = false;
+	PendingHostConnections = INDEX_NONE;
+	PendingJoinIndex = INDEX_NONE;
+
+	// Tear down any stale named session.
+	if (IOnlineSessionPtr Sessions = GetSessionInterface())
+	{
+		if (Sessions->GetNamedSession(SessionName))
+		{
+			Sessions->DestroySession(SessionName);
+		}
+	}
+
+	// /Game/Maps/MainMenu matches GameDefaultMap in DefaultEngine.ini
+	if (APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController())
+	{
+		PC->ClientTravel(TEXT("/Game/Maps/MainMenu"), TRAVEL_Absolute);
+	}
 }

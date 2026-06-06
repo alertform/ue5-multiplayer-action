@@ -43,6 +43,10 @@ class MULTIPLAYERACTION_API UMASessionSubsystem : public UGameInstanceSubsystem
 public:
 	UMASessionSubsystem();
 
+	// UGameInstanceSubsystem interface
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+
 	UFUNCTION(BlueprintCallable, Category = "Session")
 	void HostSession(int32 NumPublicConnections, const FString& MapName, const FString& PlayerName = TEXT(""));
 
@@ -98,10 +102,19 @@ private:
 	void HandleDestroySessionComplete(FName InSessionName, bool bWasSuccessful);
 	void HandleStaleSessionDestroyed(FName InSessionName, bool bWasSuccessful);
 
+	/** Client-only: tears down stale session and returns to main menu on network disconnect. */
+	void HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
+	/** Tears down stale session and returns to main menu when a travel fails. */
+	void HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
+
 	void StartCreateSession(int32 NumPublicConnections);
 	void StartJoinSession(int32 SessionIndex);
 
 	IOnlineSessionPtr GetSessionInterface() const;
 	FString BuildNameOption() const;
 	static FString SanitizePlayerName(const FString& In);
+
+	/** Handles for GEngine failure delegates — unbound in Deinitialize. */
+	FDelegateHandle NetworkFailureHandle;
+	FDelegateHandle TravelFailureHandle;
 };
