@@ -12,9 +12,11 @@ UGA_HitReact::UGA_HitReact()
 	Tags.AddTag(MAGameplayTags::Ability_Reaction_HitReact);
 	SetAssetTags(Tags);
 
-	// Feedback, not a stun: never break the target's own committed actions.
+	// Getting hit INTERRUPTS your attack (standard action-game stagger): the react montage
+	// shares the UpperBody slot, so it stomps the combo montage -> the melee task's
+	// OnInterrupted ends the ability and the chain dies. Casting stays protected for now —
+	// interrupting a committed fireball would eat its cost+cooldown without a refund path.
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);
-	ActivationBlockedTags.AddTag(MAGameplayTags::State_Attacking);
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Casting);
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dodging);
 
