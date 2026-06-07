@@ -51,6 +51,7 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	// Fresh chain: instance-per-actor means these members persist between activations.
 	ComboIndex = 0;
 	BufferedComboPresses = 0;
+	bComboWindowOpen = false;
 
 	// No actor rotation here: the upper body visually turns toward the camera via the
 	// AnimInstance spine twist (gated on our owned State.Attacking), the legs keep
@@ -99,30 +100,45 @@ void UGA_MeleeAttack::ArmComboInputTask()
 
 void UGA_MeleeAttack::OnComboInputPressed(float TimeWaited)
 {
-	// QUEUE the press — the jump decision happens at the deterministic ComboWindow notify.
-	// A boolean here eats fast triple-mashes (the 3rd press lands before the 1st window and
-	// is consumed with it); counting presses makes N mashes yield N chained swings.
+	// QUEUE the press. A boolean here eats fast triple-mashes (the 3rd press lands before the
+	// 1st window and is consumed with it); counting presses makes N mashes yield N swings.
 	BufferedComboPresses = FMath::Min(BufferedComboPresses + 1, ComboSections.Num());
 
 	// Re-arm immediately: the task is one-shot, and presses between windows must keep counting.
 	ArmComboInputTask();
+
+	// Reactive play: once the window is open, a press chains INSTANTLY (cancels the swing's
+	// recovery) instead of dying in the queue after the notify already passed.
+	if (bComboWindowOpen)
+	{
+		TryAdvanceCombo();
+	}
 }
 
 void UGA_MeleeAttack::OnComboWindow(FGameplayEventData EventData)
 {
-	// NOTE: this notify must fire BEFORE the section's dead-end blend-out begins, and the
+	// The notify OPENS the window (placed just after the hit frame). Queued presses chain
+	// right here; later presses chain instantly in OnComboInputPressed while open.
+	bComboWindowOpen = true;
+	TryAdvanceCombo();
+}
+
+void UGA_MeleeAttack::TryAdvanceCombo()
+{
+	// NOTE: the jump must happen BEFORE the section's dead-end blend-out begins, and the
 	// anticipation scales with play rate: the stop triggers BlendOut.BlendTime (REAL seconds)
 	// before the boundary, i.e. BlendTime * MontagePlayRate in montage-time. Once blending,
 	// the ASC has already cleared LocalAnimMontageInfo (OnMontageBlendingOut) and
 	// MontageJumpToSection is a silent no-op — hence the tight 0.1s BlendOut on the montage.
 	if (BufferedComboPresses <= 0 || ComboIndex + 1 >= ComboSections.Num())
 	{
-		// No chain: let the current section run out — montage end -> OnMontageEnded -> EndAbility.
+		// No chain (yet): the window stays open for a later press; without one the section
+		// runs out — montage end -> OnMontageEnded -> EndAbility.
 		return;
 	}
 
-	// Defensive: if the blend-out already started despite the notify placement, the jump
-	// would no-op — bail instead of advancing ComboIndex into a phantom swing.
+	// Defensive: if the blend-out already started, the jump would no-op — bail instead of
+	// advancing ComboIndex into a phantom swing.
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
 	if (!ASC || !ASC->IsAnimatingAbility(this))
 	{
@@ -131,6 +147,7 @@ void UGA_MeleeAttack::OnComboWindow(FGameplayEventData EventData)
 
 	++ComboIndex;
 	--BufferedComboPresses; // consume one queued press per chained swing
+	bComboWindowOpen = false; // the next section's own notify re-opens it
 
 	// Routes through the ASC's montage control: section change replicates via
 	// FGameplayAbilityRepAnimMontage — no custom replication.

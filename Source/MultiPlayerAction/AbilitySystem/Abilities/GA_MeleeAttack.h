@@ -81,10 +81,19 @@ private:
 	/** One-shot WaitInputPress task; re-armed from its own callback (continuous listening). */
 	void ArmComboInputTask();
 
+	/** Consumes one queued press and jumps to the next section when the window is open. */
+	void TryAdvanceCombo();
+
 	/** Current swing index into ComboSections — instance state, reset each activation. */
 	int32 ComboIndex = 0;
 
 	/** Press QUEUE, not a boolean: mashing N times mid-swing must yield N chained swings.
-	 *  Each window consumes one press; capped so spam can't bank more than the chain holds. */
+	 *  Each chained swing consumes one press; capped so spam can't bank more than the chain holds. */
 	int32 BufferedComboPresses = 0;
+
+	/** Window-PERIOD semantics: the ComboWindow notify OPENS the window (placed just after the
+	 *  hit frame); from then until the section's blend-out a press chains INSTANTLY — cancelling
+	 *  the swing's recovery. A reactive player who clicks late in the swing must not be punished
+	 *  by an instant-checkpoint window. Presses before the window queue up and chain at open. */
+	bool bComboWindowOpen = false;
 };
