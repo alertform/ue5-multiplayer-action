@@ -119,12 +119,20 @@ void UMAHealthBarWidget::ApplyHealth(float NewHealth, float OldHealth)
 		if (bHideUntilDamaged)
 		{
 			SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+
+			// Death: skip the chip hold entirely — fast-drain to zero, then vanish
+			// (handled in NativeTick). A corpse should not wear a lingering bar.
+			if (NewHealth <= 0.f)
+			{
+				bDeathDrain = true;
+			}
 		}
 	}
 	else
 	{
 		// Heal/respawn: the chip never trails below the real value.
 		ChipPercent = FMath::Max(ChipPercent, HealthPercent);
+		bDeathDrain = false; // respawn mid-drain cancels the death sequence
 
 		// Overhead-bar mode: back at full (dummy respawn) -> tuck the bar away again.
 		if (bHideUntilDamaged && HealthPercent >= 1.f - KINDA_SMALL_NUMBER)
@@ -140,7 +148,25 @@ void UMAHealthBarWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	if (!bBound || ChipPercent <= HealthPercent)
+	if (!bBound)
+	{
+		return;
+	}
+
+	// Overhead-bar death sequence: no hold — drain straight to zero, then collapse instantly.
+	if (bDeathDrain)
+	{
+		ChipPercent = FMath::Max(0.f, ChipPercent - DeathDrainPerSecond * InDeltaTime);
+		PushToBars();
+		if (ChipPercent <= 0.f)
+		{
+			bDeathDrain = false;
+			SetVisibility(ESlateVisibility::Collapsed);
+		}
+		return;
+	}
+
+	if (ChipPercent <= HealthPercent)
 	{
 		return;
 	}

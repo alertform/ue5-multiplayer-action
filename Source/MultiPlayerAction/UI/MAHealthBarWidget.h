@@ -51,6 +51,11 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Chip", meta = (ClampMin = "0.01", UIMax = "5.0"))
 	float ChipDrainPerSecond = 0.6f;
 
+	/** Overhead-bar death: the chip skips the hold and drains at this rate; at zero the bar
+	 *  collapses instantly. Only applies in bHideUntilDamaged mode (enemy overhead bars). */
+	UPROPERTY(EditAnywhere, Category = "Chip", meta = (ClampMin = "0.1", UIMax = "10.0"))
+	float DeathDrainPerSecond = 2.5f;
+
 	// --- Style (built in C++ at PreConstruct so designer-time template state can never
 	// --- leak a default Slate look into runtime instances) ---
 
@@ -87,6 +92,9 @@ private:
 	float HealthPercent = 1.f;
 	float ChipPercent = 1.f;
 	double LastDamageTime = -1e9;
+
+	/** Death sequence armed (overhead mode): fast-drain the chip, then collapse the bar. */
+	bool bDeathDrain = false;
 
 	void HandleHealthChange(const FOnAttributeChangeData& Data);
 	void HandleMaxHealthChange(const FOnAttributeChangeData& Data);
