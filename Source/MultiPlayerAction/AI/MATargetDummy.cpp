@@ -1,5 +1,7 @@
 #include "AI/MATargetDummy.h"
 #include "AI/MAEnemyController.h"
+#include "AIController.h"
+#include "BrainComponent.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
 #include "AbilitySystem/MAGameplayTags.h"
@@ -111,6 +113,19 @@ void AMATargetDummy::HandleDeath_Implementation()
 		return;
 	}
 
+	// The corpse must stop thinking: the AIController stays possessed, and without this the
+	// BT keeps rotating the dead body toward its target (user-spotted). Stop the brain,
+	// drop focus-driven rotation, and cancel any in-flight move.
+	if (AAIController* AI = Cast<AAIController>(GetController()))
+	{
+		if (AI->BrainComponent)
+		{
+			AI->BrainComponent->StopLogic(TEXT("Dead"));
+		}
+		AI->ClearFocus(EAIFocusPriority::Gameplay);
+		AI->StopMovement();
+	}
+
 	Multicast_PlayDeath();
 	GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMATargetDummy::Respawn, RespawnDelay, false);
 }
@@ -155,6 +170,15 @@ void AMATargetDummy::Respawn()
 	// Reset attributes + clear State.Dead so next damage round starts fresh (replicates via ASC)
 	AbilitySystemComponent->RemoveLooseGameplayTag(MAGameplayTags::State_Dead);
 	AbilitySystemComponent->SetNumericAttributeBase(UMAAttributeSet::GetHealthAttribute(), AttributeSet->GetMaxHealth());
+
+	// Wake the brain back up.
+	if (AAIController* AI = Cast<AAIController>(GetController()))
+	{
+		if (AI->BrainComponent)
+		{
+			AI->BrainComponent->RestartLogic();
+		}
+	}
 }
 
 void AMATargetDummy::Multicast_ResetVisuals_Implementation()
