@@ -43,8 +43,22 @@ void UMAAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		SetDamage(0.f);
 		if (Incoming > 0.f)
 		{
+			UAbilitySystemComponent* TargetASC = Data.Target.AbilityActorInfo->AbilitySystemComponent.Get();
 			SetHealth(FMath::Clamp(GetHealth() - Incoming, 0.f, GetMaxHealth()));
-			CheckDeath(Data.Target.AbilityActorInfo->AbilitySystemComponent.Get());
+			CheckDeath(TargetASC);
+
+			// Survivors flinch: raise the hit-react trigger (server-side; UGA_HitReact is
+			// ServerInitiated, its montage replicates to every client). The dead play
+			// the death animation instead — no flinch stacking.
+			if (TargetASC && !TargetASC->HasMatchingGameplayTag(MAGameplayTags::State_Dead))
+			{
+				FGameplayEventData Payload;
+				Payload.EventTag = MAGameplayTags::Event_Damage_Taken;
+				Payload.EventMagnitude = Incoming;
+				Payload.Instigator = Data.EffectSpec.GetEffectContext().GetInstigator();
+				Payload.Target = TargetASC->GetAvatarActor_Direct();
+				TargetASC->HandleGameplayEvent(MAGameplayTags::Event_Damage_Taken, &Payload);
+			}
 		}
 	}
 	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())

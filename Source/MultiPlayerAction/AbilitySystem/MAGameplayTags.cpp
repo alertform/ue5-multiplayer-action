@@ -49,4 +49,10 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ComboWindow, "Event.Montage.ComboWindow",
 		"GameplayEvent sent from AnimNotify near each combo section's end on AM_MeleeCombo — UGA_MeleeAttack jumps to the next section here if an attack input was buffered");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Damage_Taken, "Event.Damage.Taken",
+		"Raised server-side by UMAAttributeSet::PostGameplayEffectExecute when damage lands on a living target — AbilityTriggers entry on UGA_HitReact");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Reaction_HitReact, "Ability.Reaction.HitReact",
+		"Asset tag for UGA_HitReact — ServerInitiated flinch montage triggered by Event.Damage.Taken");
 }

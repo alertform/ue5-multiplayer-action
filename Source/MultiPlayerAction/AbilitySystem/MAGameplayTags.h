@@ -49,4 +49,10 @@ namespace MAGameplayTags
 	// Combo decision point — sent from AnimNotify near each combo section's end; the ability
 	// consumes it to decide chain-vs-finish at a deterministic montage frame (client & server agree).
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_ComboWindow);
+
+	// Raised server-side by the AttributeSet when damage lands on a survivor — triggers GA_HitReact.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Damage_Taken);
+
+	// Asset tag for GA_HitReact (ServerInitiated flinch ability, GameplayEvent-triggered).
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Reaction_HitReact);
 }
