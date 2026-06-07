@@ -95,6 +95,15 @@ public:
 	void Multicast_PlayDeath();
 
 protected:
+	/** Authored-death epilogue: as the clip ends, hand the corpse to physics — the final frame
+	 *  is authored in place and can hover; ragdoll settles it onto the ground. Runs locally on
+	 *  every machine (scheduled from Multicast_PlayDeath). */
+	void StartDeathRagdoll();
+	FTimerHandle DeathRagdollTimerHandle;
+
+public:
+
+protected:
 	// Cached pointers — ASC actually lives on PlayerState
 	UPROPERTY()
 	TObjectPtr<UMAAbilitySystemComponent> AbilitySystemComponent;

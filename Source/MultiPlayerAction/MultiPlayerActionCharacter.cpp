@@ -318,6 +318,20 @@ void AMultiPlayerActionCharacter::OnAttackInput()
 {
 	if (AbilitySystemComponent)
 	{
+		// [MBDIAG] temporary: spec state at press time, to catch the stuck-active leak.
+		for (const FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
+		{
+			if (Spec.InputID == static_cast<int32>(EMAAbilityInputID::Attack))
+			{
+				const UGameplayAbility* Prim = Spec.GetPrimaryInstance();
+				UE_LOG(LogTemp, Warning,
+					TEXT("[MBDIAG] press role=%d ActiveCount=%d SpecActive=%d InstActive=%d animating=%d"),
+					(int32)GetLocalRole(), Spec.ActiveCount, Spec.IsActive() ? 1 : 0,
+					(Prim && Prim->IsActive()) ? 1 : 0,
+					(Prim && AbilitySystemComponent->IsAnimatingAbility(const_cast<UGameplayAbility*>(Prim))) ? 1 : 0);
+			}
+		}
+
 		// InputID route instead of TryActivateAbilitiesByTag: idle spec -> activate (same as the
 		// old tag path); active spec -> replicated InputPressed event = the combo input buffer.
 		AbilitySystemComponent->AbilityLocalInputPressed(static_cast<int32>(EMAAbilityInputID::Attack));
@@ -428,15 +442,17 @@ void AMultiPlayerActionCharacter::Multicast_PlayDeath_Implementation()
 		if (DeathAnimation)
 		{
 			// Authored death: single-node playback bypasses the ABP entirely (no montage slot
-			// required); non-looping holds the final frame until SetLifeSpan cleans the corpse.
+			// required). Just before the clip's final frame, hand off to ragdoll — the authored
+			// pose ends hovering (in-place clip), physics settles the corpse onto the ground.
 			SkelMesh->PlayAnimation(DeathAnimation, false);
+			const float HandoffDelay = FMath::Max(0.1f, DeathAnimation->GetPlayLength() - 0.2f);
+			GetWorldTimerManager().SetTimer(DeathRagdollTimerHandle, this,
+				&AMultiPlayerActionCharacter::StartDeathRagdoll, HandoffDelay, false);
 		}
 		else
 		{
 			// Legacy fallback: physics ragdoll.
-			SkelMesh->SetCollisionProfileName(TEXT("Ragdoll"));
-			SkelMesh->SetSimulatePhysics(true);
-			SkelMesh->WakeAllRigidBodies();
+			StartDeathRagdoll();
 		}
 	}
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
@@ -447,5 +463,15 @@ void AMultiPlayerActionCharacter::Multicast_PlayDeath_Implementation()
 	{
 		Move->DisableMovement();
 		Move->SetComponentTickEnabled(false);
+	}
+}
+
+void AMultiPlayerActionCharacter::StartDeathRagdoll()
+{
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->SetCollisionProfileName(TEXT("Ragdoll"));
+		SkelMesh->SetSimulatePhysics(true);
+		SkelMesh->WakeAllRigidBodies();
 	}
 }

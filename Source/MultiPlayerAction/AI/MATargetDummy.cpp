@@ -174,16 +174,18 @@ void AMATargetDummy::Multicast_PlayDeath_Implementation()
 	{
 		if (DeathAnimation)
 		{
-			// Authored death: single-node playback bypasses the ABP (no montage slot needed);
-			// non-looping holds the final frame until Respawn restores the AnimBlueprint.
+			// Authored death: single-node playback bypasses the ABP (no montage slot needed).
+			// Just before the clip's final frame, hand off to ragdoll — the in-place pose
+			// hovers; physics settles the corpse until Respawn restores the AnimBlueprint.
 			SkelMesh->PlayAnimation(DeathAnimation, false);
+			const float HandoffDelay = FMath::Max(0.1f, DeathAnimation->GetPlayLength() - 0.2f);
+			GetWorldTimerManager().SetTimer(DeathRagdollTimerHandle, this,
+				&AMATargetDummy::StartDeathRagdoll, HandoffDelay, false);
 		}
 		else
 		{
 			// Legacy fallback: physics ragdoll.
-			SkelMesh->SetCollisionProfileName(TEXT("Ragdoll"));
-			SkelMesh->SetSimulatePhysics(true);
-			SkelMesh->WakeAllRigidBodies();
+			StartDeathRagdoll();
 		}
 	}
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
@@ -229,8 +231,21 @@ void AMATargetDummy::Respawn()
 	}
 }
 
+void AMATargetDummy::StartDeathRagdoll()
+{
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->SetCollisionProfileName(TEXT("Ragdoll"));
+		SkelMesh->SetSimulatePhysics(true);
+		SkelMesh->WakeAllRigidBodies();
+	}
+}
+
 void AMATargetDummy::Multicast_ResetVisuals_Implementation()
 {
+	// A pending ragdoll handoff must not fire into the respawned, re-animated body.
+	GetWorldTimerManager().ClearTimer(DeathRagdollTimerHandle);
+
 	if (USkeletalMeshComponent* SkelMesh = GetMesh())
 	{
 		// Resume the AnimBlueprint after a single-node authored death (no-op for ragdoll path).

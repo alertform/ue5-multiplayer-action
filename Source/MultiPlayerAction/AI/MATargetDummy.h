@@ -76,4 +76,9 @@ protected:
 
 	/** Shared corpse/match-end AI shutdown: stop logic, drop focus, cancel moves, wipe blackboard. */
 	void StopBrainAndWipeBlackboard();
+
+	/** Authored-death epilogue: hand the corpse to physics as the clip ends (the in-place final
+	 *  frame can hover); runs locally on every machine, cleared by Multicast_ResetVisuals. */
+	void StartDeathRagdoll();
+	FTimerHandle DeathRagdollTimerHandle;
 };
