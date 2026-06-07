@@ -8,6 +8,10 @@ UGA_HitReact::UGA_HitReact()
 	// chosen montage replicate to the owning client and simulated proxies automatically.
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 
+	// Every hit staggers: without retrigger, hits landing during an active react (0.7s) are
+	// swallowed and the victim's next attack "armors" through the rest of a combo.
+	bRetriggerInstancedAbility = true;
+
 	FGameplayTagContainer Tags;
 	Tags.AddTag(MAGameplayTags::Ability_Reaction_HitReact);
 	SetAssetTags(Tags);
