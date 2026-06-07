@@ -50,7 +50,7 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	// Fresh chain: instance-per-actor means these members persist between activations.
 	ComboIndex = 0;
-	bComboInputBuffered = false;
+	BufferedComboPresses = 0;
 
 	// No actor rotation here: the upper body visually turns toward the camera via the
 	// AnimInstance spine twist (gated on our owned State.Attacking), the legs keep
@@ -99,9 +99,13 @@ void UGA_MeleeAttack::ArmComboInputTask()
 
 void UGA_MeleeAttack::OnComboInputPressed(float TimeWaited)
 {
-	// Buffer only — the jump decision happens at the deterministic ComboWindow notify.
-	// Mashing re-presses is absorbed here: the buffer is already set, nothing to re-arm.
-	bComboInputBuffered = true;
+	// QUEUE the press — the jump decision happens at the deterministic ComboWindow notify.
+	// A boolean here eats fast triple-mashes (the 3rd press lands before the 1st window and
+	// is consumed with it); counting presses makes N mashes yield N chained swings.
+	BufferedComboPresses = FMath::Min(BufferedComboPresses + 1, ComboSections.Num());
+
+	// Re-arm immediately: the task is one-shot, and presses between windows must keep counting.
+	ArmComboInputTask();
 }
 
 void UGA_MeleeAttack::OnComboWindow(FGameplayEventData EventData)
@@ -111,7 +115,7 @@ void UGA_MeleeAttack::OnComboWindow(FGameplayEventData EventData)
 	// before the boundary, i.e. BlendTime * MontagePlayRate in montage-time. Once blending,
 	// the ASC has already cleared LocalAnimMontageInfo (OnMontageBlendingOut) and
 	// MontageJumpToSection is a silent no-op — hence the tight 0.1s BlendOut on the montage.
-	if (!bComboInputBuffered || ComboIndex + 1 >= ComboSections.Num())
+	if (BufferedComboPresses <= 0 || ComboIndex + 1 >= ComboSections.Num())
 	{
 		// No chain: let the current section run out — montage end -> OnMontageEnded -> EndAbility.
 		return;
@@ -126,14 +130,11 @@ void UGA_MeleeAttack::OnComboWindow(FGameplayEventData EventData)
 	}
 
 	++ComboIndex;
-	bComboInputBuffered = false;
+	--BufferedComboPresses; // consume one queued press per chained swing
 
 	// Routes through the ASC's montage control: section change replicates via
 	// FGameplayAbilityRepAnimMontage — no custom replication.
 	MontageJumpToSection(ComboSections[ComboIndex]);
-
-	// Next swing listens for its own re-press.
-	ArmComboInputTask();
 }
 
 void UGA_MeleeAttack::OnMontageEvent(FGameplayEventData EventData)

@@ -78,12 +78,13 @@ private:
 	/** Perform sphere trace and apply damage to hit targets */
 	void PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo);
 
-	/** One-shot WaitInputPress task; re-armed after every section jump. */
+	/** One-shot WaitInputPress task; re-armed from its own callback (continuous listening). */
 	void ArmComboInputTask();
 
 	/** Current swing index into ComboSections — instance state, reset each activation. */
 	int32 ComboIndex = 0;
 
-	/** True when the attack input was re-pressed during the current swing; consumed at the window. */
-	bool bComboInputBuffered = false;
+	/** Press QUEUE, not a boolean: mashing N times mid-swing must yield N chained swings.
+	 *  Each window consumes one press; capped so spam can't bank more than the chain holds. */
+	int32 BufferedComboPresses = 0;
 };
