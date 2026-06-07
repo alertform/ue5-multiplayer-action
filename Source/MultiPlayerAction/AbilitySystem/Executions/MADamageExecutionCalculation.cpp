@@ -1,5 +1,6 @@
 #include "AbilitySystem/Executions/MADamageExecutionCalculation.h"
 #include "AbilitySystem/MAAttributeSet.h"
+#include "AbilitySystem/MAGameplayTags.h"
 #include "AbilitySystemComponent.h"
 
 /**
@@ -48,7 +49,14 @@ void UMADamageExecutionCalculation::Execute_Implementation(
 
 	// Mitigation factor in [0, 1]: each Armor point reduces damage by ArmorScale fraction
 	const float Mitigation = FMath::Clamp(1.f - Armor * ArmorScale, 0.f, 1.f);
-	const float FinalDamage = FMath::Max(0.f, AttackPower * Mitigation);
+	float FinalDamage = FMath::Max(0.f, AttackPower * Mitigation);
+
+	// Guard: a blocking target absorbs BlockMitigation of what's left (tags captured from
+	// the target ASC at application — State.Blocking is GA_Block's ActivationOwnedTags).
+	if (EvalParams.TargetTags && EvalParams.TargetTags->HasTag(MAGameplayTags::State_Blocking))
+	{
+		FinalDamage *= FMath::Clamp(1.f - BlockMitigation, 0.f, 1.f);
+	}
 
 	if (FinalDamage > 0.f)
 	{

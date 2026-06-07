@@ -23,6 +23,8 @@ UGA_HitReact::UGA_HitReact()
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Casting);
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dodging);
+	// While guarding, GA_Block absorbs hits with its own Block_Hit overlay — no flinch.
+	ActivationBlockedTags.AddTag(MAGameplayTags::State_Blocking);
 
 	// Auto-trigger from the AttributeSet's damage event.
 	FAbilityTriggerData Trigger;

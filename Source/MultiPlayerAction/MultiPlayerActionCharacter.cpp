@@ -246,6 +246,13 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 			EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AMultiPlayerActionCharacter::OnSprintReleased);
 		}
 
+		// Block — hold raises the guard, release drops it
+		if (BlockAction)
+		{
+			EnhancedInputComponent->BindAction(BlockAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnBlockPressed);
+			EnhancedInputComponent->BindAction(BlockAction, ETriggerEvent::Completed, this, &AMultiPlayerActionCharacter::OnBlockReleased);
+		}
+
 		// Dodge — single press triggers UGA_Dodge with brief i-frame
 		if (DodgeAction)
 		{
@@ -326,6 +333,26 @@ void AMultiPlayerActionCharacter::OnSprintReleased()
 	{
 		FGameplayTagContainer AbilityTags;
 		AbilityTags.AddTag(MAGameplayTags::Ability_Movement_Sprint);
+		AbilitySystemComponent->CancelAbilities(&AbilityTags);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnBlockPressed()
+{
+	if (AbilitySystemComponent)
+	{
+		FGameplayTagContainer AbilityTags;
+		AbilityTags.AddTag(MAGameplayTags::Ability_Defense_Block);
+		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnBlockReleased()
+{
+	if (AbilitySystemComponent)
+	{
+		FGameplayTagContainer AbilityTags;
+		AbilityTags.AddTag(MAGameplayTags::Ability_Defense_Block);
 		AbilitySystemComponent->CancelAbilities(&AbilityTags);
 	}
 }

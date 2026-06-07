@@ -55,4 +55,10 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Reaction_HitReact, "Ability.Reaction.HitReact",
 		"Asset tag for UGA_HitReact — ServerInitiated flinch montage triggered by Event.Damage.Taken");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Defense_Block, "Ability.Defense.Block",
+		"Asset tag for UGA_Block — hold-style guard; input release cancels via CancelAbilities");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Blocking, "State.Blocking",
+		"ActivationOwnedTags while UGA_Block holds: ExecCalc mitigates damage, GA_HitReact is suppressed, melee activation is blocked");
 }

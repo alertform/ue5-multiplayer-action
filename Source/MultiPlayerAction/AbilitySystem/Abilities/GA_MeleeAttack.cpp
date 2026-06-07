@@ -24,6 +24,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	// No attacking out of a rooted cast — the melee montage would interrupt the fireball montage,
 	// wasting the already-committed fireball cost + cooldown before its projectile spawns.
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Casting);
+	// Release the guard to swing — attacking from inside a block would keep the mitigation
+	// tag live through the swing.
+	ActivationBlockedTags.AddTag(MAGameplayTags::State_Blocking);
 	// Owned for the swing's duration: gates the AnimInstance upper-body aim twist
 	// (spine chain toward camera yaw) — see UMAAnimInstance::NativeUpdateAnimation.
 	ActivationOwnedTags.AddTag(MAGameplayTags::State_Attacking);

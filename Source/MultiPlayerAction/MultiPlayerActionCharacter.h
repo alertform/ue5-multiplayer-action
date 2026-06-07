@@ -63,6 +63,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SprintAction;
 
+	/** Block Input Action — Hold trigger; press raises the guard, release drops it */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* BlockAction;
+
 	/** Dodge Input Action — Started fires once per press */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* DodgeAction;
@@ -133,6 +137,9 @@ protected:
 
 	void OnSprintPressed();
 	void OnSprintReleased();
+
+	void OnBlockPressed();
+	void OnBlockReleased();
 
 	void OnDodgeInput();
 

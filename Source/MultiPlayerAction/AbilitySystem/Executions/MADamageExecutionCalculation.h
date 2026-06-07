@@ -29,4 +29,8 @@ protected:
 	/** Each Armor point reduces incoming damage by this fraction. 0.05 → 5% per point, capped at 1.0 (no negative damage). */
 	UPROPERTY(EditDefaultsOnly, Category = "Damage", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float ArmorScale = 0.05f;
+
+	/** Fraction of damage absorbed while the target owns State.Blocking. 0.7 → blocked hits deal 30%. */
+	UPROPERTY(EditDefaultsOnly, Category = "Damage", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float BlockMitigation = 0.7f;
 };
