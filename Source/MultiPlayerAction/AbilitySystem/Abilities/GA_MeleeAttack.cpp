@@ -5,7 +5,9 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystem/MAGameplayTags.h"
+#include "Engine/World.h"
 #include "MultiPlayerActionCharacter.h"
+#include "TimerManager.h"
 
 UGA_MeleeAttack::UGA_MeleeAttack()
 {
@@ -104,14 +106,27 @@ void UGA_MeleeAttack::OnComboInputPressed(float TimeWaited)
 	// 1st window and is consumed with it); counting presses makes N mashes yield N swings.
 	BufferedComboPresses = FMath::Min(BufferedComboPresses + 1, ComboSections.Num());
 
-	// Re-arm immediately: the task is one-shot, and presses between windows must keep counting.
-	ArmComboInputTask();
-
 	// Reactive play: once the window is open, a press chains INSTANTLY (cancels the swing's
 	// recovery) instead of dying in the queue after the notify already passed.
 	if (bComboWindowOpen)
 	{
 		TryAdvanceCombo();
+	}
+
+	// Re-arm DEFERRED to the next tick — never synchronously from inside this callback.
+	// On a server hosting a remote client, WaitInputPress::Activate immediately fires for a
+	// cached replicated InputPressed event; a synchronous re-arm here re-enters that path
+	// and recurses until stack overflow (found by dedicated-server PIE testing).
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(
+			FTimerDelegate::CreateWeakLambda(this, [this]()
+			{
+				if (IsActive())
+				{
+					ArmComboInputTask();
+				}
+			}));
 	}
 }
 
