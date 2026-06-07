@@ -8,6 +8,16 @@ class UAnimMontage;
 
 /**
  * Melee attack ability: plays AnimMontage, does sphere trace on notify, applies damage GE.
+ *
+ * Combo chain (one ability instance + one multi-section montage):
+ * pressing attack while a swing plays buffers the input via the GAS generic replicated
+ * InputPressed event (WaitInputPress — fires on owning client AND server). At each section's
+ * Event.Montage.ComboWindow notify the ability consumes the buffer and MontageJumpToSection's
+ * to the next entry of ComboSections; without buffered input the montage runs out and the
+ * ability ends. Section state replicates through FGameplayAbilityRepAnimMontage — a
+ * misprediction corrects as a within-montage section snap, never an ability rollback.
+ * A montage without matching sections (or an empty ComboSections) degrades to the legacy
+ * single-swing behavior.
  */
 UCLASS()
 class MULTIPLAYERACTION_API UGA_MeleeAttack : public UMAGameplayAbilityBase
@@ -26,6 +36,11 @@ protected:
 	/** The montage to play for this attack */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
 	TObjectPtr<UAnimMontage> AttackMontage;
+
+	/** Montage section per combo step, in chain order. The montage must contain sections with
+	 *  these names; missing sections (or an empty array) mean no chaining — single swing. */
+	UPROPERTY(EditDefaultsOnly, Category = "Attack|Combo")
+	TArray<FName> ComboSections;
 
 	/** Play rate multiplier — increase to shorten attack duration (e.g. 2.0 = twice as fast) */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack", meta = (ClampMin = "0.1", UIMin = "0.1", UIMax = "5.0"))
@@ -51,7 +66,24 @@ protected:
 	UFUNCTION()
 	void OnMontageEnded();
 
+	/** Combo decision point — Event.Montage.ComboWindow notify near each section's end. */
+	UFUNCTION()
+	void OnComboWindow(FGameplayEventData EventData);
+
+	/** Attack re-press while the ability is active (WaitInputPress, replicated to server). */
+	UFUNCTION()
+	void OnComboInputPressed(float TimeWaited);
+
 private:
 	/** Perform sphere trace and apply damage to hit targets */
 	void PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo);
+
+	/** One-shot WaitInputPress task; re-armed after every section jump. */
+	void ArmComboInputTask();
+
+	/** Current swing index into ComboSections — instance state, reset each activation. */
+	int32 ComboIndex = 0;
+
+	/** True when the attack input was re-pressed during the current swing; consumed at the window. */
+	bool bComboInputBuffered = false;
 };

@@ -46,4 +46,7 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Attacking, "State.Attacking",
 		"ActivationOwnedTags during the melee swing (UGA_MeleeAttack); with State.Casting it gates the AnimInstance upper-body aim twist");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ComboWindow, "Event.Montage.ComboWindow",
+		"GameplayEvent sent from AnimNotify near each combo section's end on AM_MeleeCombo — UGA_MeleeAttack jumps to the next section here if an attack input was buffered");
 }

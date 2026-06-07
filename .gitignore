@@ -85,3 +85,6 @@ Content/StarterContent/**
 
 # UnrealAgentMCP lives in its own private repo - do not track in the public game repo
 Plugins/UnrealAgentMCP/
+
+# Agent-side asset download staging (raw files; imported uassets live in Content/)
+Import_Staging/

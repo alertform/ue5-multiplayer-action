@@ -1,6 +1,7 @@
 #include "AbilitySystem/Abilities/GA_MeleeAttack.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystem/MAGameplayTags.h"
@@ -24,6 +25,10 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	// Owned for the swing's duration: gates the AnimInstance upper-body aim twist
 	// (spine chain toward camera yaw) — see UMAAnimInstance::NativeUpdateAnimation.
 	ActivationOwnedTags.AddTag(MAGameplayTags::State_Attacking);
+
+	// Default 3-hit chain — section names the combo montage must define. BP children may
+	// trim/extend; an empty array (or a montage without these sections) = single swing.
+	ComboSections = { FName("Combo1"), FName("Combo2"), FName("Combo3") };
 }
 
 void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -43,6 +48,10 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
+	// Fresh chain: instance-per-actor means these members persist between activations.
+	ComboIndex = 0;
+	bComboInputBuffered = false;
+
 	// No actor rotation here: the upper body visually turns toward the camera via the
 	// AnimInstance spine twist (gated on our owned State.Attacking), the legs keep
 	// following orient-to-movement, and PerformHitTrace aims with the camera yaw directly.
@@ -57,12 +66,74 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	MontageTask->OnCancelled.AddDynamic(this, &UGA_MeleeAttack::OnMontageEnded);
 	MontageTask->ReadyForActivation();
 
-	// Wait for Event.Montage.Hit gameplay event (sent from AnimNotify in montage)
+	// Wait for Event.Montage.Hit gameplay event (sent from AnimNotify in montage).
+	// OnlyTriggerOnce=false (default): one task serves every section's hit notify.
 	UAbilityTask_WaitGameplayEvent* EventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
 		this, MAGameplayTags::Event_Montage_Hit);
 
 	EventTask->EventReceived.AddDynamic(this, &UGA_MeleeAttack::OnMontageEvent);
 	EventTask->ReadyForActivation();
+
+	// Combo decision point — fired by AnimNotify near each section's end. Deterministic montage
+	// frame on client and server (replicated montage position), so both sides make the same
+	// chain-vs-finish call; no wall-clock timer race.
+	UAbilityTask_WaitGameplayEvent* ComboWindowTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+		this, MAGameplayTags::Event_Montage_ComboWindow);
+
+	ComboWindowTask->EventReceived.AddDynamic(this, &UGA_MeleeAttack::OnComboWindow);
+	ComboWindowTask->ReadyForActivation();
+
+	ArmComboInputTask();
+}
+
+void UGA_MeleeAttack::ArmComboInputTask()
+{
+	// One-shot task. On the owning client it fires from the local press; the same press reaches
+	// the server instance via the GAS generic replicated InputPressed event
+	// (AbilityLocalInputPressed -> InvokeReplicatedEvent -> ServerSetReplicatedEvent), so the
+	// buffer fills on BOTH ends without any custom RPC.
+	UAbilityTask_WaitInputPress* InputTask = UAbilityTask_WaitInputPress::WaitInputPress(this);
+	InputTask->OnPress.AddDynamic(this, &UGA_MeleeAttack::OnComboInputPressed);
+	InputTask->ReadyForActivation();
+}
+
+void UGA_MeleeAttack::OnComboInputPressed(float TimeWaited)
+{
+	// Buffer only — the jump decision happens at the deterministic ComboWindow notify.
+	// Mashing re-presses is absorbed here: the buffer is already set, nothing to re-arm.
+	bComboInputBuffered = true;
+}
+
+void UGA_MeleeAttack::OnComboWindow(FGameplayEventData EventData)
+{
+	// NOTE: this notify must fire BEFORE the section's dead-end blend-out begins, and the
+	// anticipation scales with play rate: the stop triggers BlendOut.BlendTime (REAL seconds)
+	// before the boundary, i.e. BlendTime * MontagePlayRate in montage-time. Once blending,
+	// the ASC has already cleared LocalAnimMontageInfo (OnMontageBlendingOut) and
+	// MontageJumpToSection is a silent no-op — hence the tight 0.1s BlendOut on the montage.
+	if (!bComboInputBuffered || ComboIndex + 1 >= ComboSections.Num())
+	{
+		// No chain: let the current section run out — montage end -> OnMontageEnded -> EndAbility.
+		return;
+	}
+
+	// Defensive: if the blend-out already started despite the notify placement, the jump
+	// would no-op — bail instead of advancing ComboIndex into a phantom swing.
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC || !ASC->IsAnimatingAbility(this))
+	{
+		return;
+	}
+
+	++ComboIndex;
+	bComboInputBuffered = false;
+
+	// Routes through the ASC's montage control: section change replicates via
+	// FGameplayAbilityRepAnimMontage — no custom replication.
+	MontageJumpToSection(ComboSections[ComboIndex]);
+
+	// Next swing listens for its own re-press.
+	ArmComboInputTask();
 }
 
 void UGA_MeleeAttack::OnMontageEvent(FGameplayEventData EventData)

@@ -4,6 +4,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
@@ -12,6 +13,7 @@
 #include "InputActionValue.h"
 #include "Player/MAPlayerState.h"
 #include "Player/MAPlayerController.h"
+#include "AbilitySystem/MAAbilityInputID.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
 #include "AbilitySystem/MAGameplayTags.h"
@@ -71,7 +73,18 @@ void AMultiPlayerActionCharacter::GiveDefaultAbilities()
 	{
 		if (AbilityClass)
 		{
-			AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1, INDEX_NONE, this));
+			FGameplayAbilitySpec Spec(AbilityClass, 1, INDEX_NONE, this);
+
+			// Melee gets a GAS InputID: AbilityLocalInputPressed(Attack) activates the idle spec
+			// and, while the combo ability is active, raises the replicated InputPressed event
+			// its WaitInputPress task consumes as the combo buffer (client AND server).
+			const UGameplayAbility* AbilityCDO = AbilityClass->GetDefaultObject<UGameplayAbility>();
+			if (AbilityCDO && AbilityCDO->GetAssetTags().HasTag(MAGameplayTags::Ability_Melee_Attack))
+			{
+				Spec.InputID = static_cast<int32>(EMAAbilityInputID::Attack);
+			}
+
+			AbilitySystemComponent->GiveAbility(Spec);
 		}
 	}
 
@@ -176,6 +189,13 @@ AMultiPlayerActionCharacter::AMultiPlayerActionCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
+
+	// Held weapon visual on the right hand. Bones double as attach sockets — no socket asset
+	// needed. Mesh asset + grip offset live in BP defaults; collision off (cosmetic only).
+	WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMesh"));
+	WeaponMesh->SetupAttachment(GetMesh(), TEXT("hand_r"));
+	WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WeaponMesh->SetGenerateOverlapEvents(false);
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
@@ -284,9 +304,9 @@ void AMultiPlayerActionCharacter::OnAttackInput()
 {
 	if (AbilitySystemComponent)
 	{
-		FGameplayTagContainer AbilityTags;
-		AbilityTags.AddTag(MAGameplayTags::Ability_Melee_Attack);
-		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
+		// InputID route instead of TryActivateAbilitiesByTag: idle spec -> activate (same as the
+		// old tag path); active spec -> replicated InputPressed event = the combo input buffer.
+		AbilitySystemComponent->AbilityLocalInputPressed(static_cast<int32>(EMAAbilityInputID::Attack));
 	}
 }
 

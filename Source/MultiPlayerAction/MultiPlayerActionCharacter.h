@@ -32,7 +32,13 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
-	
+
+	/** Held weapon visual, attached to the mesh's hand_r bone. The StaticMesh asset and the
+	 *  grip offset are configured in BP defaults (no content references in C++). Purely
+	 *  cosmetic — melee hit detection stays the GA's server-side sphere sweep. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class UStaticMeshComponent> WeaponMesh;
+
 	/** MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputMappingContext* DefaultMappingContext;

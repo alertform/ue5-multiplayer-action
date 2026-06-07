@@ -45,4 +45,8 @@ namespace MAGameplayTags
 	// Melee swing state — owned for the swing's duration; drives the AnimInstance upper-body
 	// aim twist (spine chain toward camera yaw) together with State.Casting.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Attacking);
+
+	// Combo decision point — sent from AnimNotify near each combo section's end; the ability
+	// consumes it to decide chain-vs-finish at a deterministic montage frame (client & server agree).
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_ComboWindow);
 }
