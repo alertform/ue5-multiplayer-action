@@ -102,6 +102,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS")
 	TSubclassOf<class UGameplayEffect> StaminaRegenEffect;
 
+	/** Authored death animation (full body, played via single-node mode — bypasses the ABP, no
+	 *  montage slot needed; non-looping so the final frame holds until the corpse despawns).
+	 *  Unset = legacy ragdoll death. Set in BP defaults (e.g. Death_A_Manny). */
+	UPROPERTY(EditDefaultsOnly, Category = "Death")
+	TObjectPtr<class UAnimSequence> DeathAnimation;
+
 	virtual void PossessedBy(AController* NewController) override;       // Server: init ASC
 	virtual void OnRep_PlayerState() override;                           // Client: init ASC
 

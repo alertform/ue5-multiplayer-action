@@ -375,9 +375,19 @@ void AMultiPlayerActionCharacter::Multicast_PlayDeath_Implementation()
 {
 	if (USkeletalMeshComponent* SkelMesh = GetMesh())
 	{
-		SkelMesh->SetCollisionProfileName(TEXT("Ragdoll"));
-		SkelMesh->SetSimulatePhysics(true);
-		SkelMesh->WakeAllRigidBodies();
+		if (DeathAnimation)
+		{
+			// Authored death: single-node playback bypasses the ABP entirely (no montage slot
+			// required); non-looping holds the final frame until SetLifeSpan cleans the corpse.
+			SkelMesh->PlayAnimation(DeathAnimation, false);
+		}
+		else
+		{
+			// Legacy fallback: physics ragdoll.
+			SkelMesh->SetCollisionProfileName(TEXT("Ragdoll"));
+			SkelMesh->SetSimulatePhysics(true);
+			SkelMesh->WakeAllRigidBodies();
+		}
 	}
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{

@@ -119,9 +119,19 @@ void AMATargetDummy::Multicast_PlayDeath_Implementation()
 {
 	if (USkeletalMeshComponent* SkelMesh = GetMesh())
 	{
-		SkelMesh->SetCollisionProfileName(TEXT("Ragdoll"));
-		SkelMesh->SetSimulatePhysics(true);
-		SkelMesh->WakeAllRigidBodies();
+		if (DeathAnimation)
+		{
+			// Authored death: single-node playback bypasses the ABP (no montage slot needed);
+			// non-looping holds the final frame until Respawn restores the AnimBlueprint.
+			SkelMesh->PlayAnimation(DeathAnimation, false);
+		}
+		else
+		{
+			// Legacy fallback: physics ragdoll.
+			SkelMesh->SetCollisionProfileName(TEXT("Ragdoll"));
+			SkelMesh->SetSimulatePhysics(true);
+			SkelMesh->WakeAllRigidBodies();
+		}
 	}
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
@@ -151,6 +161,9 @@ void AMATargetDummy::Multicast_ResetVisuals_Implementation()
 {
 	if (USkeletalMeshComponent* SkelMesh = GetMesh())
 	{
+		// Resume the AnimBlueprint after a single-node authored death (no-op for ragdoll path).
+		SkelMesh->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+
 		SkelMesh->SetSimulatePhysics(false);
 		SkelMesh->SetCollisionProfileName(TEXT("CharacterMesh"));
 		SkelMesh->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::SnapToTargetIncludingScale);

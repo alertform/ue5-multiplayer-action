@@ -61,6 +61,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS")
 	TSubclassOf<class UGameplayEffect> StaminaRegenEffect;
 
+	/** Authored death animation (single-node playback, final frame holds until respawn).
+	 *  Unset = legacy ragdoll. Respawn restores the AnimBlueprint mode. */
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	TObjectPtr<class UAnimSequence> DeathAnimation;
+
 	FTimerHandle RespawnTimerHandle;
 
 	void Respawn();
