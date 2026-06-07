@@ -1,6 +1,8 @@
 #include "AI/MATargetDummy.h"
 #include "AI/MAEnemyController.h"
 #include "AIController.h"
+#include "BehaviorTree/BlackboardComponent.h"
+#include "BehaviorTree/BlackboardData.h"
 #include "BrainComponent.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
@@ -124,6 +126,20 @@ void AMATargetDummy::HandleDeath_Implementation()
 		}
 		AI->ClearFocus(EAIFocusPriority::Gameplay);
 		AI->StopMovement();
+
+		// Wipe the blackboard: values frozen at death (e.g. "target in range") are stale by
+		// respawn time — RestartLogic would act on them BEFORE the first service tick
+		// repopulates, producing one phantom attack on wake (user-spotted).
+		if (UBlackboardComponent* BB = AI->GetBlackboardComponent())
+		{
+			if (const UBlackboardData* BBAsset = BB->GetBlackboardAsset())
+			{
+				for (const FBlackboardEntry& Entry : BBAsset->Keys)
+				{
+					BB->ClearValue(Entry.EntryName);
+				}
+			}
+		}
 	}
 
 	Multicast_PlayDeath();
