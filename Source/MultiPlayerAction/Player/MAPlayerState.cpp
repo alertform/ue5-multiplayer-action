@@ -1,6 +1,7 @@
 #include "Player/MAPlayerState.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
+#include "Net/UnrealNetwork.h"
 
 AMAPlayerState::AMAPlayerState()
 {
@@ -18,4 +19,12 @@ AMAPlayerState::AMAPlayerState()
 UAbilitySystemComponent* AMAPlayerState::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+void AMAPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AMAPlayerState, Kills);
+	DOREPLIFETIME(AMAPlayerState, Deaths);
 }

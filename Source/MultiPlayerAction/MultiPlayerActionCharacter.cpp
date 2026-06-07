@@ -264,6 +264,13 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 		{
 			EnhancedInputComponent->BindAction(FireballAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnFireballInput);
 		}
+
+		// Scoreboard — hold Tab to peek at the standings (pure local UI, no GAS involved)
+		if (ScoreboardAction)
+		{
+			EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnScoreboardPressed);
+			EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Completed, this, &AMultiPlayerActionCharacter::OnScoreboardReleased);
+		}
 	}
 	else
 	{
@@ -374,6 +381,22 @@ void AMultiPlayerActionCharacter::OnFireballInput()
 		FGameplayTagContainer AbilityTags;
 		AbilityTags.AddTag(MAGameplayTags::Ability_Ranged_Fireball);
 		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnScoreboardPressed()
+{
+	if (AMAPlayerController* PC = Cast<AMAPlayerController>(Controller))
+	{
+		PC->SetScoreboardVisible(true);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnScoreboardReleased()
+{
+	if (AMAPlayerController* PC = Cast<AMAPlayerController>(Controller))
+	{
+		PC->SetScoreboardVisible(false);
 	}
 }
 

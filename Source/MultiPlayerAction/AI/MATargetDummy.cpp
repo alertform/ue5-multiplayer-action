@@ -15,6 +15,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/GameMode.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
 
@@ -115,9 +116,17 @@ void AMATargetDummy::HandleDeath_Implementation()
 		return;
 	}
 
-	// The corpse must stop thinking: the AIController stays possessed, and without this the
-	// BT keeps rotating the dead body toward its target (user-spotted). Stop the brain,
-	// drop focus-driven rotation, and cancel any in-flight move.
+	// The corpse must stop thinking (user-spotted: the possessed AIController's BT kept
+	// rotating the dead body toward its target).
+	StopBrainAndWipeBlackboard();
+
+	Multicast_PlayDeath();
+	GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMATargetDummy::Respawn, RespawnDelay, false);
+}
+
+void AMATargetDummy::StopBrainAndWipeBlackboard()
+{
+	// Stop the brain, drop focus-driven rotation, and cancel any in-flight move.
 	if (AAIController* AI = Cast<AAIController>(GetController()))
 	{
 		if (AI->BrainComponent)
@@ -127,8 +136,8 @@ void AMATargetDummy::HandleDeath_Implementation()
 		AI->ClearFocus(EAIFocusPriority::Gameplay);
 		AI->StopMovement();
 
-		// Wipe the blackboard: values frozen at death (e.g. "target in range") are stale by
-		// respawn time — RestartLogic would act on them BEFORE the first service tick
+		// Wipe the blackboard: values frozen at stop time (e.g. "target in range") are stale
+		// by restart time — RestartLogic would act on them BEFORE the first service tick
 		// repopulates, producing one phantom attack on wake (user-spotted).
 		if (UBlackboardComponent* BB = AI->GetBlackboardComponent())
 		{
@@ -141,9 +150,22 @@ void AMATargetDummy::HandleDeath_Implementation()
 			}
 		}
 	}
+}
 
-	Multicast_PlayDeath();
-	GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMATargetDummy::Respawn, RespawnDelay, false);
+void AMATargetDummy::FreezeForPostMatch()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	StopBrainAndWipeBlackboard();
+
+	// End any in-flight swing (montage stops with the ability).
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->CancelAbilities();
+	}
 }
 
 void AMATargetDummy::Multicast_PlayDeath_Implementation()
@@ -179,6 +201,16 @@ void AMATargetDummy::Respawn()
 	if (!HasAuthority() || !AbilitySystemComponent || !AttributeSet)
 	{
 		return;
+	}
+
+	// Match over while we were dead: stay down through the results screen —
+	// the post-match map restart brings everything back fresh.
+	if (const AGameMode* GM = GetWorld()->GetAuthGameMode<AGameMode>())
+	{
+		if (!GM->IsMatchInProgress())
+		{
+			return;
+		}
 	}
 
 	Multicast_ResetVisuals();

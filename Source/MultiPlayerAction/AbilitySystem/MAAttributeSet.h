@@ -24,8 +24,10 @@ public:
 
 	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData& Data) override;
 
-	/** Static death gate. Call after ANY Health mutation (GE path or direct SetNumericAttributeBase). */
-	static void CheckDeath(class UAbilitySystemComponent* ASC);
+	/** Static death gate. Call after ANY Health mutation (GE path or direct SetNumericAttributeBase).
+	 *  KillerActor (effect-context instigator: PlayerState for players, pawn for dummies) feeds the
+	 *  GameMode's scoreboard on the authority; pass null for unattributed deaths (cheats/suicide). */
+	static void CheckDeath(class UAbilitySystemComponent* ASC, AActor* KillerActor = nullptr);
 
 	// Health
 	UPROPERTY(BlueprintReadOnly, Category = "Attributes", ReplicatedUsing = OnRep_Health)

@@ -39,6 +39,10 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_ResetVisuals();
 
+	/** Server-only, match ended: stop the brain mid-swing and cancel in-flight abilities.
+	 *  Pose/corpse stays as-is — the post-match map restart cleans the slate. */
+	void FreezeForPostMatch();
+
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "GAS")
 	TObjectPtr<UMAAbilitySystemComponent> AbilitySystemComponent;
@@ -69,4 +73,7 @@ protected:
 	FTimerHandle RespawnTimerHandle;
 
 	void Respawn();
+
+	/** Shared corpse/match-end AI shutdown: stop logic, drop focus, cancel moves, wipe blackboard. */
+	void StopBrainAndWipeBlackboard();
 };

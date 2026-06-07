@@ -1,0 +1,120 @@
+#include "UI/MAMatchStatusWidget.h"
+#include "MAGameState.h"
+#include "Player/MAPlayerState.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
+#include "GameFramework/GameMode.h"
+#include "Styling/CoreStyle.h"
+#include "Engine/World.h"
+
+// File-unique names: adaptive unity build can merge UI .cpps into one TU, so file-local
+// constants must not collide across files (see the NodeGraphUtils C2084 lesson).
+static const FLinearColor GMatchStatusText(0.92f, 0.92f, 0.92f, 1.f);
+static const FLinearColor GMatchStatusAccent(1.0f, 0.78f, 0.35f, 1.f);   // skill-bar amber
+static const FLinearColor GMatchStatusShadow(0.f, 0.f, 0.f, 0.8f);
+
+void UMAMatchStatusWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+
+	// Never intercept input — this is a pure readout.
+	SetVisibility(ESlateVisibility::HitTestInvisible);
+
+	UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
+	WidgetTree->RootWidget = Root;
+
+	// Top-center stack: clock over score line.
+	UVerticalBox* TopStack = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("TopStack"));
+	UCanvasPanelSlot* TopSlot = Root->AddChildToCanvas(TopStack);
+	TopSlot->SetAnchors(FAnchors(0.5f, 0.f));
+	TopSlot->SetAlignment(FVector2D(0.5f, 0.f));
+	TopSlot->SetAutoSize(true);
+	TopSlot->SetPosition(FVector2D(0.f, 14.f));
+
+	ClockText = MakeText(26, GMatchStatusAccent);
+	ClockText->SetText(FText::FromString(TEXT("--:--")));
+	if (UVerticalBoxSlot* ClockSlot = TopStack->AddChildToVerticalBox(ClockText))
+	{
+		ClockSlot->SetHorizontalAlignment(HAlign_Center);
+	}
+
+	ScoreText = MakeText(15, GMatchStatusText);
+	if (UVerticalBoxSlot* ScoreSlot = TopStack->AddChildToVerticalBox(ScoreText))
+	{
+		ScoreSlot->SetHorizontalAlignment(HAlign_Center);
+		ScoreSlot->SetPadding(FMargin(0.f, 3.f, 0.f, 0.f));
+	}
+
+	// Centered respawn countdown, hidden until dead.
+	RespawnText = MakeText(24, GMatchStatusText);
+	UCanvasPanelSlot* RespawnSlot = Root->AddChildToCanvas(RespawnText);
+	RespawnSlot->SetAnchors(FAnchors(0.5f, 0.42f));
+	RespawnSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+	RespawnSlot->SetAutoSize(true);
+	RespawnSlot->SetPosition(FVector2D(0.f, 0.f));
+	RespawnText->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UMAMatchStatusWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	const AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr;
+	if (!GS)
+	{
+		return;
+	}
+
+	const float ServerNow = GS->GetServerWorldTimeSeconds();
+	const FName State = GS->GetMatchState();
+
+	if (ClockText)
+	{
+		if (State == MatchState::WaitingPostMatch)
+		{
+			ClockText->SetText(FText::FromString(TEXT("MATCH OVER")));
+		}
+		else if (State == MatchState::InProgress && GS->MatchEndServerTime > 0.f)
+		{
+			const int32 Remaining = FMath::Max(0, FMath::CeilToInt(GS->MatchEndServerTime - ServerNow));
+			ClockText->SetText(FText::FromString(FString::Printf(TEXT("%02d:%02d"), Remaining / 60, Remaining % 60)));
+		}
+	}
+
+	if (ScoreText)
+	{
+		const APlayerController* PC = GetOwningPlayer();
+		if (const AMAPlayerState* PS = PC ? PC->GetPlayerState<AMAPlayerState>() : nullptr)
+		{
+			ScoreText->SetText(FText::FromString(FString::Printf(
+				TEXT("K %d / %d    D %d"), PS->GetKills(), GS->KillTarget, PS->GetDeaths())));
+		}
+	}
+
+	if (RespawnText)
+	{
+		// Only meaningful mid-match; post-match the pinned scoreboard owns the screen.
+		const float RespawnRemaining = RespawnEndServerTime - ServerNow;
+		const bool bShowRespawn = State == MatchState::InProgress && RespawnRemaining > 0.f;
+		if (bShowRespawn)
+		{
+			RespawnText->SetText(FText::FromString(FString::Printf(
+				TEXT("RESPAWN IN %d"), FMath::CeilToInt(RespawnRemaining))));
+		}
+		RespawnText->SetVisibility(bShowRespawn ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
+
+UTextBlock* UMAMatchStatusWidget::MakeText(int32 FontSize, const FLinearColor& Color)
+{
+	UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	Text->SetFont(FSlateFontInfo(FCoreStyle::GetDefaultFontStyle("Bold", FontSize)));
+	Text->SetColorAndOpacity(FSlateColor(Color));
+	Text->SetShadowOffset(FVector2D(1.f, 1.f));
+	Text->SetShadowColorAndOpacity(GMatchStatusShadow);
+	return Text;
+}

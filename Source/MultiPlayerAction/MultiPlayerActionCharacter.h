@@ -75,6 +75,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* FireballAction;
 
+	/** Scoreboard Input Action — Hold trigger; press shows the board, release hides it */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ScoreboardAction;
+
 public:
 	AMultiPlayerActionCharacter();
 
@@ -144,6 +148,9 @@ protected:
 	void OnDodgeInput();
 
 	void OnFireballInput();
+
+	void OnScoreboardPressed();
+	void OnScoreboardReleased();
 
 
 protected:

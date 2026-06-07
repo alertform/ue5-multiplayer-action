@@ -4,6 +4,8 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/MACombatantInterface.h"
 #include "AbilitySystem/MAGameplayTags.h"
+#include "MultiPlayerActionGameMode.h"
+#include "Engine/World.h"
 
 UMAAttributeSet::UMAAttributeSet()
 {
@@ -45,7 +47,7 @@ void UMAAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		{
 			UAbilitySystemComponent* TargetASC = Data.Target.AbilityActorInfo->AbilitySystemComponent.Get();
 			SetHealth(FMath::Clamp(GetHealth() - Incoming, 0.f, GetMaxHealth()));
-			CheckDeath(TargetASC);
+			CheckDeath(TargetASC, Data.EffectSpec.GetEffectContext().GetInstigator());
 
 			// Survivors flinch: raise the hit-react trigger (server-side; UGA_HitReact is
 			// ServerInitiated, its montage replicates to every client). The dead play
@@ -73,7 +75,7 @@ void UMAAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 	}
 }
 
-void UMAAttributeSet::CheckDeath(UAbilitySystemComponent* ASC)
+void UMAAttributeSet::CheckDeath(UAbilitySystemComponent* ASC, AActor* KillerActor)
 {
 	if (!ASC) return;
 	if (ASC->HasMatchingGameplayTag(MAGameplayTags::State_Dead)) return;
@@ -88,6 +90,13 @@ void UMAAttributeSet::CheckDeath(UAbilitySystemComponent* ASC)
 	if (AvatarActor->Implements<UMACombatantInterface>())
 	{
 		IMACombatantInterface::Execute_HandleDeath(AvatarActor);
+	}
+
+	// Scoreboard bookkeeping — only the authority has a GameMode; clients learn the
+	// result through PlayerState replication.
+	if (AMultiPlayerActionGameMode* GM = AvatarActor->GetWorld()->GetAuthGameMode<AMultiPlayerActionGameMode>())
+	{
+		GM->NotifyKill(KillerActor, AvatarActor);
 	}
 }
 

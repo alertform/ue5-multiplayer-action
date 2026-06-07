@@ -5,11 +5,15 @@
 #include "MAPlayerController.generated.h"
 
 class UMAUserWidget;
+class UMAMatchStatusWidget;
+class UMAScoreboardWidget;
 
 /**
  * Owns local-player UI. Spawns the HUD widget on BeginPlay and binds it to the
  * owning ASC as soon as the PlayerState is available (server: in BeginPlay,
- * client: in OnRep_PlayerState — whichever happens first).
+ * client: in OnRep_PlayerState — whichever happens first). Also owns the match
+ * overlay (clock/score/respawn) and the Tab scoreboard — both code-built C++
+ * widgets spawned straight from their classes, no BP assets involved.
  */
 UCLASS()
 class MULTIPLAYERACTION_API AMAPlayerController : public APlayerController
@@ -33,6 +37,17 @@ public:
 	/** Server-only: queue Respawn() to fire after Delay seconds */
 	void ScheduleRespawn(float Delay);
 
+	/** Show/hide the Tab scoreboard. While WaitingPostMatch it is pinned visible regardless. */
+	void SetScoreboardVisible(bool bVisible);
+
+	/** Local-player reaction to the match ending — called on every machine from
+	 *  AMAGameState::HandleMatchHasEnded (replication-driven, no extra RPC). */
+	void OnLocalMatchEnded();
+
+	/** Server -> owning client: HUD respawn countdown (server world time when respawn fires). */
+	UFUNCTION(Client, Reliable)
+	void Client_OnRespawnScheduled(float RespawnEndServerTime);
+
 protected:
 	void Respawn();
 	FTimerHandle RespawnTimerHandle;
@@ -44,6 +59,20 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UMAUserWidget> HUDWidget;
+
+	/** Match overlay (clock / K-D / respawn countdown). Defaults to the C++ class. */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UMAMatchStatusWidget> MatchStatusWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UMAMatchStatusWidget> MatchStatusWidget;
+
+	/** Tab scoreboard / post-match results panel. Defaults to the C++ class. */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UMAScoreboardWidget> ScoreboardWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UMAScoreboardWidget> ScoreboardWidget;
 
 private:
 	/** Idempotent: creates widget if not yet created, then binds to ASC if PS available. */
