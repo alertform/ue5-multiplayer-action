@@ -26,6 +26,7 @@ public:
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual void NativeDestruct() override;
 
 private:
 	UPROPERTY()
@@ -37,7 +38,15 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTextBlock> RespawnText;
 
+	/** "KILLED BY <name>" line above the respawn countdown; fed by the GameState kill event. */
+	UPROPERTY()
+	TObjectPtr<UTextBlock> KilledByText;
+
 	float RespawnEndServerTime = -1.f;
+	FString LastKillerName;
+	bool bBoundToKillEvent = false;
+
+	void HandleKill(const FString& KillerName, const FString& VictimName);
 
 	/** Shadowed bold text in the HUD palette. */
 	UTextBlock* MakeText(int32 FontSize, const FLinearColor& Color);

@@ -4,6 +4,10 @@
 #include "GameFramework/GameState.h"
 #include "MAGameState.generated.h"
 
+/** Fired locally on every machine when a kill replicates in (see Multicast_OnKill).
+ *  Killer may be empty (unattributed death — cheats/suicide). */
+DECLARE_MULTICAST_DELEGATE_TwoParams(FMAOnKillEvent, const FString& /*KillerName*/, const FString& /*VictimName*/);
+
 /**
  * Match-scoped replicated state for the deathmatch loop. The engine MatchState machine
  * (AGameMode/AGameState) already drives the phases and replicates them — this class only
@@ -36,6 +40,14 @@ public:
 	float RestartServerTime = -1.f;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	/** Server-only entry (GameMode kill router): pushes one kill line to every machine.
+	 *  Transient event — a feed misses nothing by not being state-replicated to late joiners. */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnKill(const FString& KillerName, const FString& VictimName);
+
+	/** Local-side fan-out for UI (kill feed, KILLED BY). Bind with AddUObject + RemoveAll. */
+	FMAOnKillEvent OnKillEvent;
 
 protected:
 	/** Runs on the server AND on every client when MatchState hits WaitingPostMatch —

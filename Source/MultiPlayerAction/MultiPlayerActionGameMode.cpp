@@ -82,6 +82,17 @@ void AMultiPlayerActionGameMode::NotifyKill(AActor* KillerActor, AActor* VictimA
 	{
 		KillerPS->AddKill(); // suicides count the death but never the kill
 	}
+
+	// Kill feed: dummies have no PlayerState — present them by a fixed name. A suicide
+	// keeps the killer column empty (the feed renders "<victim> died").
+	if (AMAGameState* GS = GetGameState<AMAGameState>())
+	{
+		const FString DummyName = TEXT("Dummy");
+		const FString KillerName = (KillerPS && KillerPS != VictimPS) ? KillerPS->GetPlayerName()
+			: (!KillerPS && KillerActor) ? DummyName : FString();
+		const FString VictimName = VictimPS ? VictimPS->GetPlayerName() : DummyName;
+		GS->Multicast_OnKill(KillerName, VictimName);
+	}
 	// Win condition is polled by AGameMode::Tick via ReadyToEndMatch — no check needed here.
 }
 

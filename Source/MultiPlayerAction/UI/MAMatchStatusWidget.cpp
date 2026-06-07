@@ -57,16 +57,52 @@ void UMAMatchStatusWidget::NativeOnInitialized()
 	RespawnSlot->SetAutoSize(true);
 	RespawnSlot->SetPosition(FVector2D(0.f, 0.f));
 	RespawnText->SetVisibility(ESlateVisibility::Collapsed);
+
+	// Who got you — sits just above the countdown, same show/hide gate.
+	KilledByText = MakeText(15, GMatchStatusAccent);
+	UCanvasPanelSlot* KilledBySlot = Root->AddChildToCanvas(KilledByText);
+	KilledBySlot->SetAnchors(FAnchors(0.5f, 0.42f));
+	KilledBySlot->SetAlignment(FVector2D(0.5f, 0.5f));
+	KilledBySlot->SetAutoSize(true);
+	KilledBySlot->SetPosition(FVector2D(0.f, -30.f));
+	KilledByText->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UMAMatchStatusWidget::NativeDestruct()
+{
+	if (AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr)
+	{
+		GS->OnKillEvent.RemoveAll(this);
+	}
+	Super::NativeDestruct();
+}
+
+void UMAMatchStatusWidget::HandleKill(const FString& KillerName, const FString& VictimName)
+{
+	// Only remember who killed THIS player; empty killer (suicide) clears the line.
+	const APlayerController* PC = GetOwningPlayer();
+	const APlayerState* PS = PC ? PC->PlayerState : nullptr;
+	if (PS && VictimName == PS->GetPlayerName())
+	{
+		LastKillerName = KillerName;
+	}
 }
 
 void UMAMatchStatusWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	const AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr;
+	AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr;
 	if (!GS)
 	{
 		return;
+	}
+
+	// GameState shows up after widget creation — bind the kill event lazily, once.
+	if (!bBoundToKillEvent)
+	{
+		GS->OnKillEvent.AddUObject(this, &UMAMatchStatusWidget::HandleKill);
+		bBoundToKillEvent = true;
 	}
 
 	const float ServerNow = GS->GetServerWorldTimeSeconds();
@@ -106,6 +142,17 @@ void UMAMatchStatusWidget::NativeTick(const FGeometry& MyGeometry, float InDelta
 				TEXT("RESPAWN IN %d"), FMath::CeilToInt(RespawnRemaining))));
 		}
 		RespawnText->SetVisibility(bShowRespawn ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+
+		if (KilledByText)
+		{
+			const bool bShowKiller = bShowRespawn && !LastKillerName.IsEmpty();
+			if (bShowKiller)
+			{
+				KilledByText->SetText(FText::FromString(FString::Printf(
+					TEXT("KILLED BY %s"), *LastKillerName)));
+			}
+			KilledByText->SetVisibility(bShowKiller ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		}
 	}
 }
 

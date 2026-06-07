@@ -41,6 +41,7 @@ private:
 	struct FScoreRow
 	{
 		UHorizontalBox* Box = nullptr;
+		UTextBlock* Rank = nullptr;
 		UTextBlock* Name = nullptr;
 		UTextBlock* Kills = nullptr;
 		UTextBlock* Deaths = nullptr;

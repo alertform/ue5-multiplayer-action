@@ -14,6 +14,11 @@ void AMAGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AMAGameState, RestartServerTime);
 }
 
+void AMAGameState::Multicast_OnKill_Implementation(const FString& KillerName, const FString& VictimName)
+{
+	OnKillEvent.Broadcast(KillerName, VictimName);
+}
+
 void AMAGameState::HandleMatchHasEnded()
 {
 	Super::HandleMatchHasEnded();

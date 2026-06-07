@@ -22,7 +22,10 @@ static const FLinearColor GScoreboardAccent(1.0f, 0.78f, 0.35f, 1.f);   // skill
 static const FLinearColor GScoreboardShadow(0.f, 0.f, 0.f, 0.8f);
 static const FLinearColor GScoreboardPanelBg(0.02f, 0.02f, 0.04f, 0.86f);
 
+static const FLinearColor GScoreboardGold(1.0f, 0.88f, 0.25f, 1.f);     // post-match winner row
+
 static const float GScoreboardRefreshInterval = 0.25f;
+static const float GScoreboardRankColWidth = 36.f;
 static const float GScoreboardNumColWidth = 56.f;
 static const float GScoreboardPingColWidth = 76.f;
 
@@ -73,10 +76,12 @@ void UMAScoreboardWidget::NativeOnInitialized()
 	// Column headers share the row geometry so everything lines up.
 	FScoreRow Header;
 	UHorizontalBox* HeaderBox = MakeRow(Header, 13);
+	Header.Rank->SetText(FText::FromString(TEXT("#")));
 	Header.Name->SetText(FText::FromString(TEXT("PLAYER")));
 	Header.Kills->SetText(FText::FromString(TEXT("K")));
 	Header.Deaths->SetText(FText::FromString(TEXT("D")));
 	Header.Ping->SetText(FText::FromString(TEXT("PING")));
+	Header.Rank->SetColorAndOpacity(FSlateColor(GScoreboardDim));
 	Header.Name->SetColorAndOpacity(FSlateColor(GScoreboardDim));
 	Header.Kills->SetColorAndOpacity(FSlateColor(GScoreboardDim));
 	Header.Deaths->SetColorAndOpacity(FSlateColor(GScoreboardDim));
@@ -147,19 +152,25 @@ void UMAScoreboardWidget::RefreshBoard()
 	});
 
 	const APlayerState* LocalPS = GetOwningPlayer() ? GetOwningPlayer()->PlayerState : nullptr;
+	const bool bPostMatch = GS->GetMatchState() == MatchState::WaitingPostMatch;
 
 	for (int32 i = 0; i < Ranked.Num(); ++i)
 	{
 		FScoreRow& Row = EnsureRow(i);
 		Row.Box->SetVisibility(ESlateVisibility::HitTestInvisible);
 
+		Row.Rank->SetText(FText::FromString(FString::Printf(TEXT("%d"), i + 1)));
 		Row.Name->SetText(FText::FromString(Ranked[i]->GetPlayerName()));
 		Row.Kills->SetText(FText::AsNumber(Ranked[i]->GetKills()));
 		Row.Deaths->SetText(FText::AsNumber(Ranked[i]->GetDeaths()));
 		Row.Ping->SetText(FText::AsNumber(FMath::RoundToInt(Ranked[i]->GetPingInMilliseconds())));
 
-		// Highlight the local player's line.
-		const FSlateColor RowColor(Ranked[i] == LocalPS ? GScoreboardAccent : GScoreboardText);
+		// Post-match the verdict row goes gold (overrides the local-player amber).
+		const bool bWinnerRow = bPostMatch && !GS->WinnerName.IsEmpty()
+			&& Ranked[i]->GetPlayerName() == GS->WinnerName;
+		const FSlateColor RowColor(bWinnerRow ? GScoreboardGold
+			: Ranked[i] == LocalPS ? GScoreboardAccent : GScoreboardText);
+		Row.Rank->SetColorAndOpacity(RowColor);
 		Row.Name->SetColorAndOpacity(RowColor);
 		Row.Kills->SetColorAndOpacity(RowColor);
 		Row.Deaths->SetColorAndOpacity(RowColor);
@@ -192,6 +203,7 @@ UHorizontalBox* UMAScoreboardWidget::MakeRow(FScoreRow& OutRow, int32 FontSize)
 {
 	UHorizontalBox* Box = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	OutRow.Box = Box;
+	OutRow.Rank = MakeCell(Box, GScoreboardRankColWidth, FontSize);
 	OutRow.Name = MakeCell(Box, 0.f, FontSize);
 	OutRow.Kills = MakeCell(Box, GScoreboardNumColWidth, FontSize);
 	OutRow.Deaths = MakeCell(Box, GScoreboardNumColWidth, FontSize);

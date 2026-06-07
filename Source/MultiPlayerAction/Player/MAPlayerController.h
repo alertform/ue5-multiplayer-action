@@ -7,6 +7,7 @@
 class UMAUserWidget;
 class UMAMatchStatusWidget;
 class UMAScoreboardWidget;
+class UMAKillFeedWidget;
 
 /**
  * Owns local-player UI. Spawns the HUD widget on BeginPlay and binds it to the
@@ -73,6 +74,13 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UMAScoreboardWidget> ScoreboardWidget;
+
+	/** Top-right kill feed. Defaults to the C++ class. */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UMAKillFeedWidget> KillFeedWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UMAKillFeedWidget> KillFeedWidget;
 
 private:
 	/** Idempotent: creates widget if not yet created, then binds to ASC if PS available. */

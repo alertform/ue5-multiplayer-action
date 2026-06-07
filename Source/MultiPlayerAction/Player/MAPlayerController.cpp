@@ -3,6 +3,7 @@
 #include "UI/MAUserWidget.h"
 #include "UI/MAMatchStatusWidget.h"
 #include "UI/MAScoreboardWidget.h"
+#include "UI/MAKillFeedWidget.h"
 #include "AbilitySystem/MAAttributeSet.h"
 #include "AbilitySystem/MAGameplayTags.h"
 #include "AbilitySystemComponent.h"
@@ -28,6 +29,7 @@ AMAPlayerController::AMAPlayerController()
 	// Match UI is pure C++ — spawn straight from the classes (BP override possible but unused).
 	MatchStatusWidgetClass = UMAMatchStatusWidget::StaticClass();
 	ScoreboardWidgetClass = UMAScoreboardWidget::StaticClass();
+	KillFeedWidgetClass = UMAKillFeedWidget::StaticClass();
 }
 
 void AMAPlayerController::BeginPlay()
@@ -216,6 +218,14 @@ void AMAPlayerController::EnsureHUDInitialized()
 		{
 			ScoreboardWidget->AddToViewport(10);
 			ScoreboardWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+	if (!KillFeedWidget && KillFeedWidgetClass)
+	{
+		KillFeedWidget = CreateWidget<UMAKillFeedWidget>(this, KillFeedWidgetClass);
+		if (KillFeedWidget)
+		{
+			KillFeedWidget->AddToViewport(2);
 		}
 	}
 }
