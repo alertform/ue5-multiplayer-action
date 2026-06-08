@@ -16,6 +16,7 @@ class UInputAction;
 class UMAAbilitySystemComponent;
 class UMAAttributeSet;
 class UGameplayAbility;
+class UMALockOnComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -38,6 +39,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	 *  cosmetic — melee hit detection stays the GA's server-side sphere sweep. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class UStaticMeshComponent> WeaponMesh;
+
+	/** Soft-lock targeting (local-player camera/UI only — does nothing on simulated proxies) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Targeting, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMALockOnComponent> LockOnComponent;
 
 	/** MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -78,6 +83,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	/** Scoreboard Input Action — Hold trigger; press shows the board, release hides it */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ScoreboardAction;
+
+	/** Lock-on Input Action — Started toggles target lock (R3 / Middle Mouse) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* LockOnAction;
 
 public:
 	AMultiPlayerActionCharacter();
@@ -161,6 +170,17 @@ protected:
 	void OnScoreboardPressed();
 	void OnScoreboardReleased();
 
+	/** Toggle soft-lock onto the best target in front; release if already locked. */
+	void OnLockOnInput();
+
+public:
+	/** Console cheats mirroring the lock-on input — testable without a gamepad.
+	 *  `LockOnToggle`, `LockOnSwitch 1` (right) / `LockOnSwitch -1` (left). */
+	UFUNCTION(Exec)
+	void LockOnToggle();
+
+	UFUNCTION(Exec)
+	void LockOnSwitch(float Direction = 1.f);
 
 protected:
 

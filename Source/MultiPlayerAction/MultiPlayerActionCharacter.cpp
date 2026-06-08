@@ -13,6 +13,7 @@
 #include "InputActionValue.h"
 #include "Player/MAPlayerState.h"
 #include "Player/MAPlayerController.h"
+#include "Targeting/MALockOnComponent.h"
 #include "AbilitySystem/MAAbilityInputID.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
@@ -197,6 +198,10 @@ AMultiPlayerActionCharacter::AMultiPlayerActionCharacter()
 	WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	WeaponMesh->SetGenerateOverlapEvents(false);
 
+	// Soft-lock targeting. Exists on every copy but only acts on the locally-controlled
+	// pawn (see UMALockOnComponent::OwnerIsLocallyControlled) — no replication.
+	LockOnComponent = CreateDefaultSubobject<UMALockOnComponent>(TEXT("LockOnComponent"));
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
@@ -271,6 +276,13 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 			EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnScoreboardPressed);
 			EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Completed, this, &AMultiPlayerActionCharacter::OnScoreboardReleased);
 		}
+
+		// Lock-on — single press toggles target lock (R3 / Middle Mouse). While locked, the
+		// right-stick flick that switches target is handled inside Look() via the component.
+		if (LockOnAction)
+		{
+			EnhancedInputComponent->BindAction(LockOnAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnLockOnInput);
+		}
 	}
 	else
 	{
@@ -305,6 +317,13 @@ void AMultiPlayerActionCharacter::Look(const FInputActionValue& Value)
 {
 	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
+
+	// While locked, the look axis drives target-switching (and the camera stays on the
+	// target); HandleLookInput returns true to swallow the free-look this frame.
+	if (LockOnComponent && LockOnComponent->HandleLookInput(LookAxisVector))
+	{
+		return;
+	}
 
 	if (Controller != nullptr)
 	{
@@ -411,6 +430,30 @@ void AMultiPlayerActionCharacter::OnScoreboardReleased()
 	if (AMAPlayerController* PC = Cast<AMAPlayerController>(Controller))
 	{
 		PC->SetScoreboardVisible(false);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnLockOnInput()
+{
+	if (LockOnComponent)
+	{
+		LockOnComponent->ToggleLock();
+	}
+}
+
+void AMultiPlayerActionCharacter::LockOnToggle()
+{
+	if (LockOnComponent)
+	{
+		LockOnComponent->ToggleLock();
+	}
+}
+
+void AMultiPlayerActionCharacter::LockOnSwitch(float Direction)
+{
+	if (LockOnComponent)
+	{
+		LockOnComponent->SwitchTarget(Direction);
 	}
 }
 
