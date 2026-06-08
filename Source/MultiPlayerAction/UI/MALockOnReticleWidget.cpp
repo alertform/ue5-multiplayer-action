@@ -3,15 +3,29 @@
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 #include "Components/Image.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "GameFramework/PlayerController.h"
 
 // File-unique names — adaptive unity build merges UI .cpps (C2084 lesson).
-// Elden Ring–style lock marker: a small soft white dot.
-static const FVector2D GLockReticleSize(14.f, 14.f);
-static const FLinearColor GLockReticleFill(1.0f, 1.0f, 1.0f, 0.95f);
-static const FLinearColor GLockReticleOutline(0.0f, 0.0f, 0.0f, 0.45f); // faint rim for contrast
+// Elden Ring–style lock marker: a small white dot with a soft, blurred edge. Slate has no
+// edge-blur on a brush, so we fake a Gaussian falloff by stacking concentric white circles —
+// big+faint at the back, small+bright at the front. Their overlapping translucency composites
+// into a bright core that fades out smoothly, no texture asset required.
+namespace
+{
+	struct FLockRing { float Size; float Alpha; };
+	static const FLockRing GLockRings[] = {
+		{ 22.f, 0.04f },
+		{ 18.f, 0.07f },
+		{ 14.5f, 0.12f },
+		{ 11.5f, 0.20f },
+		{ 9.0f, 0.38f },
+		{ 6.5f, 0.95f }, // bright core
+	};
+}
 
 void UMALockOnReticleWidget::NativeOnInitialized()
 {
@@ -23,27 +37,37 @@ void UMALockOnReticleWidget::NativeOnInitialized()
 	UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
 	WidgetTree->RootWidget = Root;
 
-	Marker = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Marker"));
+	Glow = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("Glow"));
 
-	// White filled circle (rounded-box radius = half size) with a faint dark rim so it
-	// reads on bright targets — the Elden Ring lock-on dot.
-	FSlateRoundedBoxBrush Dot(GLockReticleFill, GLockReticleSize.X * 0.5f,
-		GLockReticleOutline, 1.0f, GLockReticleSize);
-	Marker->SetBrush(Dot);
+	for (const FLockRing& Ring : GLockRings)
+	{
+		UImage* Layer = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+		// Rounded-box radius = half the size => a perfect circle at native size.
+		FSlateRoundedBoxBrush Circle(FLinearColor(1.f, 1.f, 1.f, Ring.Alpha), Ring.Size * 0.5f,
+			FVector2D(Ring.Size, Ring.Size));
+		Layer->SetBrush(Circle);
 
-	MarkerSlot = Root->AddChildToCanvas(Marker);
-	MarkerSlot->SetAutoSize(true);
-	MarkerSlot->SetAlignment(FVector2D(0.5f, 0.5f)); // position == marker center
+		if (UOverlaySlot* LayerSlot = Glow->AddChildToOverlay(Layer))
+		{
+			// Center-align so every ring shares the same center (concentric) at its native size.
+			LayerSlot->SetHorizontalAlignment(HAlign_Center);
+			LayerSlot->SetVerticalAlignment(VAlign_Center);
+		}
+	}
 
-	Marker->SetVisibility(ESlateVisibility::Collapsed);
+	GlowSlot = Root->AddChildToCanvas(Glow);
+	GlowSlot->SetAutoSize(true);
+	GlowSlot->SetAlignment(FVector2D(0.5f, 0.5f)); // position == dot center
+
+	Glow->SetVisibility(ESlateVisibility::Collapsed);
 }
 
 void UMALockOnReticleWidget::SetTarget(AActor* InTarget)
 {
 	Target = InTarget;
-	if (Marker && !InTarget)
+	if (Glow && !InTarget)
 	{
-		Marker->SetVisibility(ESlateVisibility::Collapsed);
+		Glow->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
@@ -51,7 +75,7 @@ void UMALockOnReticleWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	if (!Marker || !MarkerSlot)
+	if (!Glow || !GlowSlot)
 	{
 		return;
 	}
@@ -60,7 +84,7 @@ void UMALockOnReticleWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	APlayerController* PC = GetOwningPlayer();
 	if (!T || !PC)
 	{
-		Marker->SetVisibility(ESlateVisibility::Collapsed);
+		Glow->SetVisibility(ESlateVisibility::Collapsed);
 		return;
 	}
 
@@ -69,11 +93,11 @@ void UMALockOnReticleWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	// Returns DPI-scaled widget-space position; false when the point is behind the camera.
 	if (UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, WorldLoc, ScreenPos, false))
 	{
-		MarkerSlot->SetPosition(ScreenPos);
-		Marker->SetVisibility(ESlateVisibility::HitTestInvisible);
+		GlowSlot->SetPosition(ScreenPos);
+		Glow->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
 	else
 	{
-		Marker->SetVisibility(ESlateVisibility::Collapsed);
+		Glow->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }

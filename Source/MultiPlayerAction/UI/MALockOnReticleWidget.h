@@ -4,7 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "MALockOnReticleWidget.generated.h"
 
-class UImage;
+class UOverlay;
 class UCanvasPanelSlot;
 
 /**
@@ -27,11 +27,13 @@ protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+	/** Concentric translucent circles whose overlap composites into a soft, blurred-edge dot. */
 	UPROPERTY()
-	TObjectPtr<UImage> Marker;
+	TObjectPtr<UOverlay> Glow;
 
+	/** Canvas slot that parks the dot over the target each tick. */
 	UPROPERTY()
-	TObjectPtr<UCanvasPanelSlot> MarkerSlot;
+	TObjectPtr<UCanvasPanelSlot> GlowSlot;
 
 	TWeakObjectPtr<AActor> Target;
 
