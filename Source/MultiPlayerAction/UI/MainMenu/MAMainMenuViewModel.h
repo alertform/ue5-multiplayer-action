@@ -40,10 +40,6 @@ public:
 	void SetIsBusy(bool In) { UE_MVVM_SET_PROPERTY_VALUE(bIsBusy, In); }
 	FText GetStatusText() const { return StatusText; }
 	void SetStatusText(const FText& In) { UE_MVVM_SET_PROPERTY_VALUE(StatusText, In); }
-	int32 GetMaxPlayers() const { return MaxPlayers; }
-	void SetMaxPlayers(int32 In) { UE_MVVM_SET_PROPERTY_VALUE(MaxPlayers, FMath::Clamp(In, 1, 8)); }
-	FText GetPlayerName() const { return PlayerName; }
-	void SetPlayerName(const FText& In) { UE_MVVM_SET_PROPERTY_VALUE(PlayerName, In); }
 	bool HasSessions() const { return bHasSessions; }
 	void SetHasSessions(bool In) { UE_MVVM_SET_PROPERTY_VALUE(bHasSessions, In); }
 
@@ -57,12 +53,6 @@ private:
 
 	UPROPERTY(BlueprintReadOnly, FieldNotify, Getter = GetStatusText, Setter = SetStatusText, meta = (AllowPrivateAccess = "true"))
 	FText StatusText;
-
-	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter = GetMaxPlayers, Setter = SetMaxPlayers, meta = (AllowPrivateAccess = "true"))
-	int32 MaxPlayers = 4;
-
-	UPROPERTY(BlueprintReadWrite, FieldNotify, Getter = GetPlayerName, Setter = SetPlayerName, meta = (AllowPrivateAccess = "true"))
-	FText PlayerName;
 
 	UPROPERTY(BlueprintReadOnly, FieldNotify, Getter = HasSessions, Setter = SetHasSessions, meta = (AllowPrivateAccess = "true"))
 	bool bHasSessions = false;

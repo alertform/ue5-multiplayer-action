@@ -8,6 +8,9 @@ namespace
 {
 	/** Gameplay map the host travels into (and clients follow via session join). */
 	const TCHAR* const GameplayMapPath = TEXT("/Game/Maps/ThirdPersonMap");
+
+	/** Fixed lobby size — the menu no longer exposes a player-count field. */
+	const int32 DefaultMaxPlayers = 4;
 }
 
 void UMAMainMenuViewModel::Initialize(UMASessionSubsystem* InSubsystem, APlayerController* InOwningPC)
@@ -41,7 +44,8 @@ void UMAMainMenuViewModel::Host()
 	if (!Subsystem) { return; }
 	SetIsBusy(true);
 	SetStatusText(FText::FromString(TEXT("Creating session...")));
-	Subsystem->HostSession(MaxPlayers, GameplayMapPath, PlayerName.ToString());
+	// Empty name => the engine assigns default player names (Player 0/1/...).
+	Subsystem->HostSession(DefaultMaxPlayers, GameplayMapPath, FString());
 }
 
 void UMAMainMenuViewModel::Refresh()
@@ -57,7 +61,6 @@ void UMAMainMenuViewModel::Join(int32 EntryIndex)
 	if (!Subsystem) { return; }
 	SetIsBusy(true);
 	SetStatusText(FText::FromString(TEXT("Joining...")));
-	Subsystem->SetLocalPlayerName(PlayerName.ToString());
 	Subsystem->JoinSessionByIndex(EntryIndex);
 }
 
