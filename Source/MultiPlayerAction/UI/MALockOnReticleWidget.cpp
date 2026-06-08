@@ -4,12 +4,14 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
-#include "Brushes/SlateColorBrush.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "GameFramework/PlayerController.h"
 
 // File-unique names — adaptive unity build merges UI .cpps (C2084 lesson).
-static const FLinearColor GLockReticleColor(1.0f, 0.22f, 0.18f, 0.95f); // red lock diamond
-static const FVector2D GLockReticleSize(26.f, 26.f);
+// Elden Ring–style lock marker: a small soft white dot.
+static const FVector2D GLockReticleSize(14.f, 14.f);
+static const FLinearColor GLockReticleFill(1.0f, 1.0f, 1.0f, 0.95f);
+static const FLinearColor GLockReticleOutline(0.0f, 0.0f, 0.0f, 0.45f); // faint rim for contrast
 
 void UMALockOnReticleWidget::NativeOnInitialized()
 {
@@ -23,14 +25,11 @@ void UMALockOnReticleWidget::NativeOnInitialized()
 
 	Marker = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Marker"));
 
-	// Solid white box (FSlateColorBrush references the engine white texture); tint via
-	// ColorAndOpacity so the brush itself stays neutral. Rotated 45° => diamond.
-	FSlateColorBrush Brush(FLinearColor::White);
-	Brush.ImageSize = GLockReticleSize;
-	Marker->SetBrush(Brush);
-	Marker->SetColorAndOpacity(GLockReticleColor);
-	Marker->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
-	Marker->SetRenderTransformAngle(45.f);
+	// White filled circle (rounded-box radius = half size) with a faint dark rim so it
+	// reads on bright targets — the Elden Ring lock-on dot.
+	FSlateRoundedBoxBrush Dot(GLockReticleFill, GLockReticleSize.X * 0.5f,
+		GLockReticleOutline, 1.0f, GLockReticleSize);
+	Marker->SetBrush(Dot);
 
 	MarkerSlot = Root->AddChildToCanvas(Marker);
 	MarkerSlot->SetAutoSize(true);
