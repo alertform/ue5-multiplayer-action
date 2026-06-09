@@ -68,5 +68,6 @@ void UMAPredictionMovementComponent::TickComponent(float DeltaTime, ELevelTick T
 		PingMs, S.TotalCorrections, S.CorrectionsPerSec, S.LastErrorCm, S.MaxErrorCm);
 
 	// Fixed key (refreshes in place each tick); cyan so it stands out from the lag-comp draws.
-	GEngine->AddOnScreenDebugMessage((uint64)0x4D41505244, 0.f, FColor::Cyan, Readout);
+	// TimeToDisplay must exceed one frame, or the engine expires the message before it renders.
+	GEngine->AddOnScreenDebugMessage((uint64)0x4D41505244, FMath::Max(2.f * DeltaTime, 0.1f), FColor::Cyan, Readout);
 }
