@@ -16,4 +16,13 @@ namespace MALagCompGeometry
 
 	/** Linear interpolation between two snapshots at absolute time T (T clamped to [Older.Time, Newer.Time]). */
 	FMACapsuleSnapshot InterpolateSnapshot(const FMACapsuleSnapshot& Older, const FMACapsuleSnapshot& Newer, float T);
+
+	/** Sample a time-ascending history at RewindTime via bracketing + interpolation.
+	 *  Clamps to the ends when RewindTime is out of range. Returns false only when History is empty. */
+	bool SampleHistory(const TArray<FMACapsuleSnapshot>& History, float RewindTime, FMACapsuleSnapshot& OutSnap);
+
+	/** Full per-target rewind decision: sample History at RewindTime, then swept-sphere test.
+	 *  On hit, sets OutRewoundCenter to the sampled capsule centre. */
+	bool ResolveRewoundHit(const TArray<FMACapsuleSnapshot>& History, float RewindTime,
+		const FVector& Start, const FVector& End, float SphereRadius, FVector& OutRewoundCenter);
 }

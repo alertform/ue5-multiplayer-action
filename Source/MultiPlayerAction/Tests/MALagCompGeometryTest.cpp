@@ -71,4 +71,74 @@ bool FMALagCompInterpTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+// Build a synthetic strafe: target moves +Y at 600 cm/s, snapshots every 0.1s over [0,1]s.
+static TArray<FMACapsuleSnapshot> MakeStrafeHistory()
+{
+	TArray<FMACapsuleSnapshot> H;
+	for (int32 i = 0; i <= 10; ++i)
+	{
+		FMACapsuleSnapshot S;
+		S.Time = i * 0.1f;
+		S.Center = FVector(0, 600.f * S.Time, 0);
+		S.HalfHeight = 88.f;
+		S.Radius = 34.f;
+		H.Add(S);
+	}
+	return H;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMALagCompSampleHistoryTest,
+	"MultiPlayerAction.LagComp.SampleHistory",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMALagCompSampleHistoryTest::RunTest(const FString& Parameters)
+{
+	using namespace MALagCompGeometry;
+	const TArray<FMACapsuleSnapshot> H = MakeStrafeHistory();
+
+	FMACapsuleSnapshot Out;
+	TestTrue(TEXT("sampled"), SampleHistory(H, 0.5f, Out));
+	TestTrue(TEXT("mid pos"), Out.Center.Equals(FVector(0, 300, 0), 0.5f));
+
+	// Clamp before oldest.
+	TestTrue(TEXT("clamp lo ok"), SampleHistory(H, -1.f, Out));
+	TestTrue(TEXT("clamp lo pos"), Out.Center.Equals(FVector(0, 0, 0), 0.5f));
+
+	// Clamp after newest.
+	TestTrue(TEXT("clamp hi ok"), SampleHistory(H, 99.f, Out));
+	TestTrue(TEXT("clamp hi pos"), Out.Center.Equals(FVector(0, 600, 0), 0.5f));
+
+	// Empty -> false.
+	TArray<FMACapsuleSnapshot> Empty;
+	TestFalse(TEXT("empty"), SampleHistory(Empty, 0.5f, Out));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMALagCompResolveTest,
+	"MultiPlayerAction.LagComp.ResolveRewoundHit",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMALagCompResolveTest::RunTest(const FString& Parameters)
+{
+	using namespace MALagCompGeometry;
+	const TArray<FMACapsuleSnapshot> H = MakeStrafeHistory();
+
+	// Attacker swings a sphere through Y=300 (where the target was at t=0.5).
+	const FVector Start(-50, 300, 0);
+	const FVector End(150, 300, 0);
+	const float R = 50.f;
+
+	// Rewound to t=0.5 -> the capsule was at Y=300 -> HIT.
+	FVector Center;
+	TestTrue(TEXT("hit rewound"), ResolveRewoundHit(H, 0.5f, Start, End, R, Center));
+	TestTrue(TEXT("rewound center"), Center.Equals(FVector(0, 300, 0), 0.5f));
+
+	// The SAME swing tested against the CURRENT position (Y=600) must MISS.
+	TestFalse(TEXT("miss current"),
+		SweptSphereVsCapsule(Start, End, R, FVector(0, 600, 0), 88.f, 34.f));
+
+	return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

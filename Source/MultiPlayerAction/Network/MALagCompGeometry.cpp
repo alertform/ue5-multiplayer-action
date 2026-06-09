@@ -75,4 +75,50 @@ namespace MALagCompGeometry
 		Out.Radius = FMath::Lerp(Older.Radius, Newer.Radius, Alpha);
 		return Out;
 	}
+
+	bool SampleHistory(const TArray<FMACapsuleSnapshot>& History, float RewindTime, FMACapsuleSnapshot& OutSnap)
+	{
+		const int32 Num = History.Num();
+		if (Num == 0)
+		{
+			return false;
+		}
+		if (Num == 1 || RewindTime <= History[0].Time)
+		{
+			OutSnap = History[0];
+			return true;
+		}
+		if (RewindTime >= History.Last().Time)
+		{
+			OutSnap = History.Last();
+			return true;
+		}
+		// Find the first snapshot at/after RewindTime; interpolate with its predecessor.
+		for (int32 i = 1; i < Num; ++i)
+		{
+			if (History[i].Time >= RewindTime)
+			{
+				OutSnap = InterpolateSnapshot(History[i - 1], History[i], RewindTime);
+				return true;
+			}
+		}
+		OutSnap = History.Last();
+		return true;
+	}
+
+	bool ResolveRewoundHit(const TArray<FMACapsuleSnapshot>& History, float RewindTime,
+		const FVector& Start, const FVector& End, float SphereRadius, FVector& OutRewoundCenter)
+	{
+		FMACapsuleSnapshot Snap;
+		if (!SampleHistory(History, RewindTime, Snap))
+		{
+			return false;
+		}
+		if (SweptSphereVsCapsule(Start, End, SphereRadius, Snap.Center, Snap.HalfHeight, Snap.Radius))
+		{
+			OutRewoundCenter = Snap.Center;
+			return true;
+		}
+		return false;
+	}
 }
