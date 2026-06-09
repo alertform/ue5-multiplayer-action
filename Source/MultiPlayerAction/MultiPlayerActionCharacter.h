@@ -89,7 +89,7 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	UInputAction* LockOnAction;
 
 public:
-	AMultiPlayerActionCharacter();
+	AMultiPlayerActionCharacter(const FObjectInitializer& ObjectInitializer);
 
 	// IAbilitySystemInterface
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;

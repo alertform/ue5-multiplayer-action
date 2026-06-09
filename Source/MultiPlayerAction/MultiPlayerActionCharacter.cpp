@@ -22,6 +22,7 @@
 #include "GameplayTagContainer.h"
 #include "TimerManager.h"
 #include "Network/MALagCompSubsystem.h"
+#include "Network/MAPredictionMovementComponent.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -186,7 +187,8 @@ void AMultiPlayerActionCharacter::HandleMoveSpeedChange(const FOnAttributeChange
 //////////////////////////////////////////////////////////////////////////
 // AMultiPlayerActionCharacter
 
-AMultiPlayerActionCharacter::AMultiPlayerActionCharacter()
+AMultiPlayerActionCharacter::AMultiPlayerActionCharacter(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UMAPredictionMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
