@@ -21,6 +21,7 @@
 #include "AbilitySystemComponent.h"
 #include "GameplayTagContainer.h"
 #include "TimerManager.h"
+#include "Network/MALagCompSubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -30,6 +31,34 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 UAbilitySystemComponent* AMultiPlayerActionCharacter::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+void AMultiPlayerActionCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (HasAuthority())
+	{
+		if (UMALagCompSubsystem* LagComp = GetWorld()->GetSubsystem<UMALagCompSubsystem>())
+		{
+			LagComp->RegisterTarget(this);
+		}
+	}
+}
+
+void AMultiPlayerActionCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (HasAuthority())
+	{
+		if (UWorld* W = GetWorld())
+		{
+			if (UMALagCompSubsystem* LagComp = W->GetSubsystem<UMALagCompSubsystem>())
+			{
+				LagComp->UnregisterTarget(this);
+			}
+		}
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 void AMultiPlayerActionCharacter::PossessedBy(AController* NewController)

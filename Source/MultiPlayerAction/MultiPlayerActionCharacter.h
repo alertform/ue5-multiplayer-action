@@ -137,6 +137,9 @@ protected:
 	virtual void PossessedBy(AController* NewController) override;       // Server: init ASC
 	virtual void OnRep_PlayerState() override;                           // Client: init ASC
 
+	virtual void BeginPlay() override;                                   // Server: register with lag-comp
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	/** Grant default abilities to the ASC (server only) */
 	void GiveDefaultAbilities();
 

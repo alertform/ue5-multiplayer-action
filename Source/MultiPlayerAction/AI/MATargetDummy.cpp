@@ -18,6 +18,7 @@
 #include "GameFramework/GameMode.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
+#include "Network/MALagCompSubsystem.h"
 
 AMATargetDummy::AMATargetDummy()
 {
@@ -61,6 +62,16 @@ void AMATargetDummy::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Register as a lag-comp rewind target (server-only). A stationary dummy is trivially
+	// correct and lets us smoke-test the rewind buffer in PIE.
+	if (HasAuthority())
+	{
+		if (UMALagCompSubsystem* LagComp = GetWorld()->GetSubsystem<UMALagCompSubsystem>())
+		{
+			LagComp->RegisterTarget(this);
+		}
+	}
+
 	// Server-only: init attributes, grant abilities, apply regen GE
 	if (HasAuthority() && AttributeSet && AbilitySystemComponent)
 	{
@@ -102,6 +113,21 @@ void AMATargetDummy::BeginPlay()
 			Widget->InitFromASC(AbilitySystemComponent);
 		}
 	}
+}
+
+void AMATargetDummy::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (HasAuthority())
+	{
+		if (UWorld* W = GetWorld())
+		{
+			if (UMALagCompSubsystem* LagComp = W->GetSubsystem<UMALagCompSubsystem>())
+			{
+				LagComp->UnregisterTarget(this);
+			}
+		}
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 UAbilitySystemComponent* AMATargetDummy::GetAbilitySystemComponent() const
