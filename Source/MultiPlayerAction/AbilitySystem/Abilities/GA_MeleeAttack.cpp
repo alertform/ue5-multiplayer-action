@@ -8,6 +8,8 @@
 #include "Engine/World.h"
 #include "MultiPlayerActionCharacter.h"
 #include "TimerManager.h"
+#include "Network/MALagCompSubsystem.h"
+#include "GameFramework/PlayerState.h"
 
 UGA_MeleeAttack::UGA_MeleeAttack()
 {
@@ -200,25 +202,28 @@ void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
+// Mirror of the subsystem's master toggle, read on the game thread.
+static bool CVarMeleeLagCompEnabled()
+{
+	static IConsoleVariable* Var = IConsoleManager::Get().FindConsoleVariable(TEXT("ma.LagComp.Enabled"));
+	return Var ? (Var->GetInt() != 0) : true;
+}
+
 void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo)
 {
-	// Use AvatarActor (any AActor) instead of casting to AMultiPlayerActionCharacter,
-	// so AI-controlled pawns (TargetDummy) can use the same GA class as players.
 	AActor* Avatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
 	if (!Avatar)
 	{
 		return;
 	}
 
-	// Only do authoritative hit detection on server (or standalone)
+	// Authoritative hit detection only (server / standalone).
 	if (!Avatar->HasAuthority())
 	{
 		return;
 	}
 
-	// Trace along the camera yaw, not the body facing — the actor keeps orient-to-movement
-	// during the (mobile) swing, so the body may point elsewhere while the player aims.
-	// AI pawns: GetBaseAimRotation falls back to the actor rotation — same as before.
+	// Aim along camera yaw, not body facing (the body keeps orient-to-movement during the swing).
 	const APawn* AvatarPawn = Cast<APawn>(Avatar);
 	const FRotator AimYaw(0.f,
 		AvatarPawn ? AvatarPawn->GetBaseAimRotation().Yaw : Avatar->GetActorRotation().Yaw, 0.f);
@@ -227,31 +232,79 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 	const FVector Start = Avatar->GetActorLocation() + AimDir * 50.f;
 	const FVector End = Start + AimDir * TraceDistance;
 
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(Avatar);
-
-	TArray<FHitResult> HitResults;
-	const bool bHit = Avatar->GetWorld()->SweepMultiByChannel(
-		HitResults, Start, End, FQuat::Identity,
-		ECC_Pawn, FCollisionShape::MakeSphere(TraceRadius), QueryParams);
-
-	if (!bHit || !DamageEffect)
+	if (!DamageEffect)
 	{
 		return;
 	}
 
-	for (const FHitResult& Hit : HitResults)
+	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
+	if (!SourceASC)
 	{
-		AActor* HitActor = Hit.GetActor();
-		if (!HitActor || HitActor == Avatar)
+		return;
+	}
+
+	// Collect (target actor, cue location) pairs from either the rewound query or the live sweep.
+	TArray<TPair<AActor*, FVector>> TargetsHit;
+
+	UWorld* World = Avatar->GetWorld();
+	UMALagCompSubsystem* LagComp = World ? World->GetSubsystem<UMALagCompSubsystem>() : nullptr;
+	const bool bUseLagComp = LagComp && CVarMeleeLagCompEnabled();
+
+	if (bUseLagComp)
+	{
+		// Rewind by the attacker's latency. AI pawns (no PlayerState) report ping 0 -> no rewind.
+		float PingMs = 0.f;
+		if (AvatarPawn)
+		{
+			if (const APlayerState* PS = AvatarPawn->GetPlayerState())
+			{
+				PingMs = PS->GetPingInMilliseconds();
+			}
+		}
+		const float RewindAmount = LagComp->ComputeRewindAmount(PingMs);
+		const TArray<FMARewindHit> Hits = LagComp->SweepRewound(Start, End, TraceRadius, RewindAmount, Avatar);
+		for (const FMARewindHit& Hit : Hits)
+		{
+			if (AActor* HitActor = Hit.Actor.Get())
+			{
+				TargetsHit.Emplace(HitActor, Hit.RewoundCenter);
+			}
+		}
+	}
+	else
+	{
+		// Fallback / lag-comp-disabled: sweep live positions (original behavior).
+		FCollisionQueryParams QueryParams;
+		QueryParams.AddIgnoredActor(Avatar);
+		TArray<FHitResult> HitResults;
+		const bool bHit = World->SweepMultiByChannel(
+			HitResults, Start, End, FQuat::Identity,
+			ECC_Pawn, FCollisionShape::MakeSphere(TraceRadius), QueryParams);
+		if (bHit)
+		{
+			for (const FHitResult& Hit : HitResults)
+			{
+				if (AActor* HitActor = Hit.GetActor())
+				{
+					TargetsHit.Emplace(HitActor, Hit.ImpactPoint);
+				}
+			}
+		}
+	}
+
+	// Unified application: damage GE + hit cue per unique target.
+	TSet<AActor*> Applied;
+	for (const TPair<AActor*, FVector>& Entry : TargetsHit)
+	{
+		AActor* HitActor = Entry.Key;
+		if (!HitActor || HitActor == Avatar || Applied.Contains(HitActor))
 		{
 			continue;
 		}
+		Applied.Add(HitActor);
 
-		// Apply damage GE through source ASC so prediction key + instigator/context route correctly
 		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
-		UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
-		if (!TargetASC || !SourceASC)
+		if (!TargetASC)
 		{
 			continue;
 		}
@@ -262,12 +315,9 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 		}
 
-		// Fire hit-impact cue with hit location + normal so FX spawn at exact contact point.
-		// Static cue notify (BP_GCN_MeleeHit) routes by tag and replicates to all relevant clients.
 		FGameplayCueParameters CueParams;
-		CueParams.Location = Hit.ImpactPoint;
-		CueParams.Normal = Hit.ImpactNormal;
-		CueParams.PhysicalMaterial = Hit.PhysMaterial;
+		CueParams.Location = Entry.Value;
+		CueParams.Normal = (Avatar->GetActorLocation() - Entry.Value).GetSafeNormal();
 		CueParams.Instigator = Avatar;
 		CueParams.EffectCauser = Avatar;
 		SourceASC->ExecuteGameplayCue(MAGameplayTags::GameplayCue_Melee_Hit, CueParams);
