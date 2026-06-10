@@ -83,6 +83,18 @@ void UMAAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 						{
 							Dir = -VictimChar->GetActorForwardVector(); // degenerate overlap — shove backward
 						}
+						// AI victims square up to the attack first: yaw-snap toward the instigator so
+						// the knockback reads as "hit from the front" (the react anims are front-hits)
+						// and the shove goes straight backward — orient-to-movement would otherwise
+						// leave the dummy sliding away facing wherever it last walked. Players are
+						// never force-rotated: camera/control stays theirs.
+						if (InstigatorActor && !VictimChar->IsPlayerControlled())
+						{
+							FRotator FaceAttacker = (-Dir).Rotation();
+							FaceAttacker.Pitch = 0.f;
+							FaceAttacker.Roll = 0.f;
+							VictimChar->SetActorRotation(FaceAttacker);
+						}
 						const float Impulse = MAHitFeel::ComputeHitFeel(Incoming).KnockbackImpulse;
 						VictimChar->LaunchCharacter(Dir * Impulse + FVector(0.f, 0.f, MAHitFeel::KnockbackZBoost), false, false);
 					}
