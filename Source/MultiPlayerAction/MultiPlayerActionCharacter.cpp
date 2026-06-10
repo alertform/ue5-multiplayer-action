@@ -368,18 +368,29 @@ void AMultiPlayerActionCharacter::OnAttackInput()
 {
 	if (AbilitySystemComponent)
 	{
-		// [MBDIAG] temporary: spec state at press time, to catch the stuck-active leak.
+		// Self-heal the zombie melee spec before routing input: instance active but the ASC
+		// is no longer animating it = the montage's end delegates were skipped (observed:
+		// victim-side hit-stop freeze mid-swing) and EndAbility never ran. Without this,
+		// AbilityLocalInputPressed feeds every press into the dead instance's combo buffer
+		// forever. Cancelling during the legit ~0.1s blend-out tail is harmless — chaining
+		// is impossible there anyway, the cancel just lets this press start a fresh swing.
+		FGameplayAbilitySpecHandle ZombieHandle;
 		for (const FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
 		{
 			if (Spec.InputID == static_cast<int32>(EMAAbilityInputID::Attack))
 			{
 				const UGameplayAbility* Prim = Spec.GetPrimaryInstance();
-				UE_LOG(LogTemp, Warning,
-					TEXT("[MBDIAG] press role=%d ActiveCount=%d SpecActive=%d InstActive=%d animating=%d"),
-					(int32)GetLocalRole(), Spec.ActiveCount, Spec.IsActive() ? 1 : 0,
-					(Prim && Prim->IsActive()) ? 1 : 0,
-					(Prim && AbilitySystemComponent->IsAnimatingAbility(const_cast<UGameplayAbility*>(Prim))) ? 1 : 0);
+				if (Prim && Prim->IsActive()
+					&& !AbilitySystemComponent->IsAnimatingAbility(const_cast<UGameplayAbility*>(Prim)))
+				{
+					ZombieHandle = Spec.Handle;
+					UE_LOG(LogTemp, Warning, TEXT("[MBDIAG] press healing zombie melee spec (active, not animating)"));
+				}
 			}
+		}
+		if (ZombieHandle.IsValid())
+		{
+			AbilitySystemComponent->CancelAbilityHandle(ZombieHandle);
 		}
 
 		// InputID route instead of TryActivateAbilitiesByTag: idle spec -> activate (same as the

@@ -34,7 +34,12 @@ static void ApplyHitStop(UWorld* World, USkeletalMeshComponent* Mesh, float Seco
 		}
 	}
 
-	Mesh->GlobalAnimRateScale = 0.f;
+	// NEVER exactly 0: FAnimMontageInstance::Advance with a zero delta can silently
+	// terminate a montage sitting at its dead-end/blend-out boundary WITHOUT firing the
+	// ability task's end delegates — the GA then waits forever and every later attack
+	// press is swallowed (reproduced: victim frozen mid-swing -> zombie melee spec).
+	// 0.01 is visually identical to a freeze and keeps montage bookkeeping alive.
+	Mesh->GlobalAnimRateScale = 0.01f;
 
 	FTimerHandle Handle;
 	World->GetTimerManager().SetTimer(Handle,
