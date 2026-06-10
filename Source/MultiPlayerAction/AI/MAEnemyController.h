@@ -20,6 +20,8 @@ class MULTIPLAYERACTION_API AMAEnemyController : public AAIController
 	GENERATED_BODY()
 
 public:
+	AMAEnemyController();
+
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 
@@ -27,4 +29,8 @@ protected:
 	/** BehaviorTree to run on possess. Set in BP_EnemyController defaults to BT_Enemy. */
 	UPROPERTY(EditDefaultsOnly, Category = "AI")
 	TObjectPtr<UBehaviorTree> BehaviorTreeAsset;
+
+	/** Reactive guard: target State.Attacking listener -> probabilistic GA_Block hold. */
+	UPROPERTY(VisibleAnywhere, Category = "AI")
+	TObjectPtr<class UMAAIDefenseComponent> DefenseComponent;
 };
