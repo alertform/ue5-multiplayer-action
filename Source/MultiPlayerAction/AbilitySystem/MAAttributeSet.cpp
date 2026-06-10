@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "Combat/MAHitFeel.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/Controller.h"
 
 UMAAttributeSet::UMAAttributeSet()
 {
@@ -75,25 +76,35 @@ void UMAAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 				{
 					if (ACharacter* VictimChar = Cast<ACharacter>(TargetASC->GetAvatarActor_Direct()))
 					{
-						const AActor* InstigatorActor = Data.EffectSpec.GetEffectContext().GetInstigator();
+						// Spatial source: EffectCauser is the attacking AVATAR. GetInstigator() is the
+						// OwnerActor — for players that's the PlayerState, an AInfo at the world origin,
+						// correct for kill attribution but useless for direction math.
+						const FGameplayEffectContextHandle Ctx = Data.EffectSpec.GetEffectContext();
+						const AActor* AttackSource = Ctx.GetEffectCauser() ? Ctx.GetEffectCauser() : Ctx.GetInstigator();
 						FVector Dir = VictimChar->GetActorLocation()
-							- (InstigatorActor ? InstigatorActor->GetActorLocation() : VictimChar->GetActorLocation());
+							- (AttackSource ? AttackSource->GetActorLocation() : VictimChar->GetActorLocation());
 						Dir.Z = 0.f;
 						if (!Dir.Normalize())
 						{
 							Dir = -VictimChar->GetActorForwardVector(); // degenerate overlap — shove backward
 						}
-						// AI victims square up to the attack first: yaw-snap toward the instigator so
+						// AI victims square up to the attack first: yaw-snap toward the attacker so
 						// the knockback reads as "hit from the front" (the react anims are front-hits)
-						// and the shove goes straight backward — orient-to-movement would otherwise
-						// leave the dummy sliding away facing wherever it last walked. Players are
-						// never force-rotated: camera/control stays theirs.
-						if (InstigatorActor && !VictimChar->IsPlayerControlled())
+						// and the shove goes straight backward. Players are never force-rotated:
+						// camera/control stays theirs. The dummy keeps APawn's default
+						// bUseControllerRotationYaw=true, so its yaw is re-stamped from the AI
+						// controller every tick — align the ControlRotation too or the snap lasts
+						// exactly one frame.
+						if (AttackSource && !VictimChar->IsPlayerControlled())
 						{
 							FRotator FaceAttacker = (-Dir).Rotation();
 							FaceAttacker.Pitch = 0.f;
 							FaceAttacker.Roll = 0.f;
 							VictimChar->SetActorRotation(FaceAttacker);
+							if (AController* VictimController = VictimChar->GetController())
+							{
+								VictimController->SetControlRotation(FaceAttacker);
+							}
 						}
 						const float Impulse = MAHitFeel::ComputeHitFeel(Incoming).KnockbackImpulse;
 						VictimChar->LaunchCharacter(Dir * Impulse + FVector(0.f, 0.f, MAHitFeel::KnockbackZBoost), false, false);
