@@ -43,13 +43,8 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
-	const AActor* DiagAvatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
-	UE_LOG(LogTemp, Warning, TEXT("[MBDIAG] melee ACTIVATE role=%d"),
-		DiagAvatar ? (int32)DiagAvatar->GetLocalRole() : -1);
-
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[MBDIAG] melee COMMIT FAILED"));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -186,20 +181,7 @@ void UGA_MeleeAttack::OnMontageEvent(FGameplayEventData EventData)
 
 void UGA_MeleeAttack::OnMontageEnded()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[MBDIAG] melee OnMontageEnded"));
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-}
-
-void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	bool bReplicateEndAbility, bool bWasCancelled)
-{
-	const AActor* DiagAvatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
-	UE_LOG(LogTemp, Warning, TEXT("[MBDIAG] melee END role=%d cancelled=%d active=%d"),
-		DiagAvatar ? (int32)DiagAvatar->GetLocalRole() : -1, bWasCancelled ? 1 : 0, IsActive() ? 1 : 0);
-
-	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 // Mirror of the subsystem's master toggle, read on the game thread.
