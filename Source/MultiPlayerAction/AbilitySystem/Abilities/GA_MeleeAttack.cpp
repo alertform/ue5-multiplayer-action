@@ -303,6 +303,16 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 		}
 		Applied.Add(HitActor);
 
+		// AI faction never damages itself: a dummy's swing that clips a fellow dummy
+		// (circling close in group combat) must not hurt, flinch or shove it — skip
+		// BEFORE the damage GE and the impact cue. Players are FFA (no teams) and hit
+		// everyone, including each other.
+		const APawn* HitPawn = Cast<APawn>(HitActor);
+		if (AvatarPawn && !AvatarPawn->IsPlayerControlled() && HitPawn && !HitPawn->IsPlayerControlled())
+		{
+			continue;
+		}
+
 		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
 		if (!TargetASC)
 		{
