@@ -17,9 +17,18 @@ void UMAAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		if (const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(
 			const_cast<APawn*>(PawnOwner)))
 		{
-			const bool bAimFacing =
-				ASC->HasMatchingGameplayTag(MAGameplayTags::State_Attacking) ||
-				ASC->HasMatchingGameplayTag(MAGameplayTags::State_Casting);
+			// Full-body montages (DefaultSlot: dash slash, the katana set) own the whole pose —
+			// twisting the torso toward the camera would wrench it out of the authored swing.
+			// The twist exists for UPPER-body swings whose legs follow orient-to-movement.
+			bool bFullBodyMontage = false;
+			if (const UAnimMontage* ActiveMontage = GetCurrentActiveMontage())
+			{
+				bFullBodyMontage = ActiveMontage->IsValidSlot(TEXT("DefaultSlot"));
+			}
+
+			const bool bAimFacing = !bFullBodyMontage &&
+				(ASC->HasMatchingGameplayTag(MAGameplayTags::State_Attacking) ||
+				 ASC->HasMatchingGameplayTag(MAGameplayTags::State_Casting));
 
 			if (bAimFacing)
 			{
