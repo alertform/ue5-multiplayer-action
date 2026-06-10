@@ -6,6 +6,8 @@
 #include "AbilitySystem/MAGameplayTags.h"
 #include "MultiPlayerActionGameMode.h"
 #include "Engine/World.h"
+#include "Combat/MAHitFeel.h"
+#include "GameFramework/Character.h"
 
 UMAAttributeSet::UMAAttributeSet()
 {
@@ -60,6 +62,31 @@ void UMAAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 				Payload.Instigator = Data.EffectSpec.GetEffectContext().GetInstigator();
 				Payload.Target = TargetASC->GetAvatarActor_Direct();
 				TargetASC->HandleGameplayEvent(MAGameplayTags::Event_Damage_Taken, &Payload);
+
+				// Knockback: damage-scaled shove away from the instigator. Server-only by
+				// construction (damage GEs execute on the authority); the un-predicted launch
+				// costs a player victim one movement correction — standard engine pattern,
+				// measurable via ma.PredDebug. Dodge i-frames already reject the damage GE,
+				// so the State.Dodging check is belt-and-braces against ordering changes.
+				// A State.Casting victim is rooted under MOVE_None where LaunchCharacter
+				// no-ops — reads as intentional super-armor. Covers every damage GE through
+				// this chokepoint (melee AND fireball), which is intended.
+				if (MAHitFeel::IsEnabled() && !TargetASC->HasMatchingGameplayTag(MAGameplayTags::State_Dodging))
+				{
+					if (ACharacter* VictimChar = Cast<ACharacter>(TargetASC->GetAvatarActor_Direct()))
+					{
+						const AActor* InstigatorActor = Data.EffectSpec.GetEffectContext().GetInstigator();
+						FVector Dir = VictimChar->GetActorLocation()
+							- (InstigatorActor ? InstigatorActor->GetActorLocation() : VictimChar->GetActorLocation());
+						Dir.Z = 0.f;
+						if (!Dir.Normalize())
+						{
+							Dir = -VictimChar->GetActorForwardVector(); // degenerate overlap — shove backward
+						}
+						const float Impulse = MAHitFeel::ComputeHitFeel(Incoming).KnockbackImpulse;
+						VictimChar->LaunchCharacter(Dir * Impulse + FVector(0.f, 0.f, MAHitFeel::KnockbackZBoost), false, false);
+					}
+				}
 			}
 		}
 	}
