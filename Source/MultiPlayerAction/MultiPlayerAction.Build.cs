@@ -20,7 +20,9 @@ public class MultiPlayerAction : ModuleRules
 			"NetCore", "OnlineSubsystem", "OnlineSubsystemUtils",
 			// UI
 			"UMG", "Slate", "SlateCore",
-			"ModelViewViewModel", "FieldNotification"
+			"ModelViewViewModel", "FieldNotification",
+			// Camera shakes (UDefaultCameraShakeBase + Perlin pattern live in this plugin, enabled by default)
+			"EngineCameras"
 		});
 	}
 }

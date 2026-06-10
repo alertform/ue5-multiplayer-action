@@ -320,6 +320,7 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 		CueParams.Normal = (Avatar->GetActorLocation() - Entry.Value).GetSafeNormal();
 		CueParams.Instigator = Avatar;
 		CueParams.EffectCauser = Avatar;
+		CueParams.SourceObject = HitActor; // victim — GCN_MeleeImpact freezes/shakes both parties
 		SourceASC->ExecuteGameplayCue(MAGameplayTags::GameplayCue_Melee_Hit, CueParams);
 	}
 }
