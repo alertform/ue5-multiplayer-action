@@ -14,6 +14,7 @@
 #include "Player/MAPlayerState.h"
 #include "Player/MAPlayerController.h"
 #include "Targeting/MALockOnComponent.h"
+#include "MotionWarpingComponent.h"
 #include "AbilitySystem/MAAbilityInputID.h"
 #include "AbilitySystem/MAAbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
@@ -233,6 +234,9 @@ AMultiPlayerActionCharacter::AMultiPlayerActionCharacter(const FObjectInitialize
 	// pawn (see UMALockOnComponent::OwnerIsLocallyControlled) — no replication.
 	LockOnComponent = CreateDefaultSubobject<UMALockOnComponent>(TEXT("LockOnComponent"));
 
+	// Bends the dash slash's authored root motion onto its warp target (GA_DashSlash).
+	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarping"));
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
@@ -299,6 +303,12 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 		if (FireballAction)
 		{
 			EnhancedInputComponent->BindAction(FireballAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnFireballInput);
+		}
+
+		// Dash slash — Motion-Warped root-motion katana dash
+		if (DashSlashAction)
+		{
+			EnhancedInputComponent->BindAction(DashSlashAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnDashSlashInput);
 		}
 
 		// Scoreboard — hold Tab to peek at the standings (pure local UI, no GAS involved)
@@ -445,6 +455,16 @@ void AMultiPlayerActionCharacter::OnDodgeInput()
 	{
 		FGameplayTagContainer AbilityTags;
 		AbilityTags.AddTag(MAGameplayTags::Ability_Movement_Dodge);
+		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnDashSlashInput()
+{
+	if (AbilitySystemComponent)
+	{
+		FGameplayTagContainer AbilityTags;
+		AbilityTags.AddTag(MAGameplayTags::Ability_Melee_DashSlash);
 		AbilitySystemComponent->TryActivateAbilitiesByTag(AbilityTags);
 	}
 }

@@ -29,6 +29,10 @@
 		{
 			"Name": "Aura",
 			"Enabled": false
+		},
+		{
+			"Name": "MotionWarping",
+			"Enabled": true
 		}
 	]
 }

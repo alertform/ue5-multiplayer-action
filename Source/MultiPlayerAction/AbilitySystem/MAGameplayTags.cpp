@@ -61,4 +61,9 @@ namespace MAGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Blocking, "State.Blocking",
 		"ActivationOwnedTags while UGA_Block holds: ExecCalc mitigates damage, GA_HitReact is suppressed, melee activation is blocked");
+
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Melee_DashSlash, "Ability.Melee.DashSlash",
+		"Asset tag for UGA_DashSlash — Motion-Warped root-motion dash attack (Q / gamepad Y)");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Cooldown_DashSlash, "Ability.Cooldown.DashSlash",
+		"Granted by BP_GE_Cooldown_DashSlash while the dash slash is on cooldown");
 }

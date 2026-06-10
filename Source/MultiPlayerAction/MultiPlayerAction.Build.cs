@@ -22,7 +22,9 @@ public class MultiPlayerAction : ModuleRules
 			"UMG", "Slate", "SlateCore",
 			"ModelViewViewModel", "FieldNotification",
 			// Camera shakes (UDefaultCameraShakeBase + Perlin pattern live in this plugin, enabled by default)
-			"EngineCameras"
+			"EngineCameras",
+			// Root-motion warping for the dash slash
+			"MotionWarping"
 		});
 	}
 }

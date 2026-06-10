@@ -17,6 +17,7 @@ class UMAAbilitySystemComponent;
 class UMAAttributeSet;
 class UGameplayAbility;
 class UMALockOnComponent;
+class UMotionWarpingComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -43,6 +44,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	/** Soft-lock targeting (local-player camera/UI only — does nothing on simulated proxies) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Targeting, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMALockOnComponent> LockOnComponent;
+
+	/** Warps the dash slash's authored root motion onto the selected target. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
 
 	/** MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -79,6 +84,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	/** Fireball Input Action — Started fires once per press */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* FireballAction;
+
+	/** Dash slash Input Action (Q / gamepad Y) — Started fires once per press */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* DashSlashAction;
 
 	/** Scoreboard Input Action — Hold trigger; press shows the board, release hides it */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -169,6 +178,8 @@ protected:
 	void OnDodgeInput();
 
 	void OnFireballInput();
+
+	void OnDashSlashInput();
 
 	void OnScoreboardPressed();
 	void OnScoreboardReleased();
