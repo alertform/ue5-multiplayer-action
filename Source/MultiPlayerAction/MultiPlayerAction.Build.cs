@@ -14,6 +14,8 @@ public class MultiPlayerAction : ModuleRules
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
 			// GAS
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
+			// UKismetAnimationLibrary::CalculateDirection (strafe Direction in MAAnimInstance)
+			"AnimGraphRuntime",
 			// AI
 			"AIModule", "NavigationSystem",
 			// Networking + Session

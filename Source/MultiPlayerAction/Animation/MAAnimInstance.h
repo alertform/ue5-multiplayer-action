@@ -29,6 +29,29 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Aim")
 	FRotator SpineAimRotation = FRotator::ZeroRotator;
 
+	/** Foot-IK trace gate read by the AnimGraph Control Rig node. False while airborne OR while a
+	 *  full-body (DefaultSlot) montage owns the pose — so attack swings keep their authored foot
+	 *  lifts instead of being ground-locked, which would slide the planted feet as root motion moves
+	 *  the body. True only when grounded locomotion should adapt feet to the floor. */
+	UPROPERTY(BlueprintReadOnly, Category = "IK")
+	bool bShouldDoFootIKTrace = false;
+
+	/** True while the active montage plays on DefaultSlot (full-body — the katana combo / dash). */
+	UPROPERTY(BlueprintReadOnly, Category = "IK")
+	bool bFullBodyMontageActive = false;
+
+	/** Signed angle (−180..180) of velocity relative to facing: 0 ahead, ±90 strafing, ±180
+	 *  backpedalling. Drives the katana 8-way strafe blendspace. Derived from replicated velocity +
+	 *  rotation, so simulated proxies get it for free. */
+	UPROPERTY(BlueprintReadOnly, Category = "Locomotion")
+	float Direction = 0.f;
+
+	/** True when moving fast enough AND far enough off the facing axis to use the strafe set —
+	 *  the locked-on sidestep / backpedal case. Gates the AnimGraph's BlendPosesByBool between the
+	 *  free-run blendspace and the strafe blendspace. */
+	UPROPERTY(BlueprintReadOnly, Category = "Locomotion")
+	bool bStrafing = false;
+
 protected:
 	/** Max torso twist in degrees (camera further off-axis than this gets clamped) */
 	UPROPERTY(EditDefaultsOnly, Category = "Aim", meta = (ClampMin = "0.0", UIMax = "120.0"))
@@ -41,6 +64,14 @@ protected:
 	/** Number of spine bones the twist is spread across (must match the AnimGraph node count) */
 	UPROPERTY(EditDefaultsOnly, Category = "Aim", meta = (ClampMin = "1", UIMax = "5"))
 	int32 NumSpineBones = 3;
+
+	/** Min planar speed (cm/s) before strafe can engage — filters idle jitter into bStrafing. */
+	UPROPERTY(EditDefaultsOnly, Category = "Locomotion", meta = (ClampMin = "0.0"))
+	float StrafeSpeedThreshold = 10.f;
+
+	/** |Direction| beyond this (deg) counts as strafing rather than a forward run. */
+	UPROPERTY(EditDefaultsOnly, Category = "Locomotion", meta = (ClampMin = "0.0", UIMax = "90.0"))
+	float StrafeDirectionThreshold = 25.f;
 
 private:
 	/** Smoothed full-chain yaw delta */

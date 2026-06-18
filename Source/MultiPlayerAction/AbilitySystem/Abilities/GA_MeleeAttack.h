@@ -32,6 +32,11 @@ public:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility, bool bWasCancelled) override;
+
 protected:
 	/** The montage to play for this attack */
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
@@ -58,6 +63,28 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Attack")
 	TSubclassOf<UGameplayEffect> DamageEffect;
 
+	// --- Per-swing Motion Warping (shared setup with GA_DashSlash via MAWarpOps) ---
+	// Each swing re-resolves a lunge target and warps the authored root motion onto it, so the
+	// combo closes distance instead of whiffing in place. Smaller reach than the dash: a combo
+	// swing is a step-in, not a charge. Mirrors AM_KatanaCombo's per-section AttackTarget windows.
+
+	/** Acceptance cone (half-angle, deg) around the aim yaw for picking a swing target. */
+	UPROPERTY(EditDefaultsOnly, Category = "Attack|Warp")
+	float ConeHalfAngleDeg = 35.f;
+
+	/** Beyond this, a combo swing does not snap (a step-in, not a dash). */
+	UPROPERTY(EditDefaultsOnly, Category = "Attack|Warp")
+	float MaxLungeDistanceCm = 350.f;
+
+	/** Land this far short of the target — keeps the swing at striking reach, not inside it. */
+	UPROPERTY(EditDefaultsOnly, Category = "Attack|Warp")
+	float StopDistanceCm = 120.f;
+
+	/** Forward warp when no target is in the cone. 0 (default) = let the authored 1.4–3.4 m
+	 *  swing step-in play unwarped (an acceptable whiff lunge); >0 caps it like the dash. */
+	UPROPERTY(EditDefaultsOnly, Category = "Attack|Warp")
+	float NoTargetDashCm = 0.f;
+
 	/** Called when montage hits the "Attack" notify window */
 	UFUNCTION()
 	void OnMontageEvent(FGameplayEventData EventData);
@@ -78,6 +105,10 @@ private:
 	/** Perform sphere trace and apply damage to hit targets */
 	void PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo);
 
+	/** Resolve and push this swing's Motion-Warping target ("AttackTarget"). Called on activate
+	 *  (first swing) and again on every chained swing so each one re-aims at the current foe. */
+	void SetupWarpTarget();
+
 	/** One-shot WaitInputPress task; re-armed from its own callback (continuous listening). */
 	void ArmComboInputTask();
 
@@ -96,4 +127,7 @@ private:
 	 *  the swing's recovery. A reactive player who clicks late in the swing must not be punished
 	 *  by an instant-checkpoint window. Presses before the window queue up and chain at open. */
 	bool bComboWindowOpen = false;
+
+	/** Motion-Warping target name — must match AM_KatanaCombo's per-section warp windows. */
+	static const FName WarpTargetName;
 };

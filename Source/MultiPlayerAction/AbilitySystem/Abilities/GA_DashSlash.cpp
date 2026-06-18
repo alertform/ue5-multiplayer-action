@@ -2,15 +2,11 @@
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
-#include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/MACombatantInterface.h"
 #include "AbilitySystem/MAGameplayTags.h"
 #include "Combat/MAAttackLunge.h"
 #include "Combat/MAMeleeHitOps.h"
-#include "EngineUtils.h"
-#include "GameFramework/Character.h"
-#include "MotionWarpingComponent.h"
+#include "Combat/MAWarpOps.h"
 
 static TAutoConsoleVariable<int32> CVarDashSlash(
 	TEXT("ma.DashSlash"), 1,
@@ -68,77 +64,16 @@ void UGA_DashSlash::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 void UGA_DashSlash::SetupWarpTarget()
 {
-	ACharacter* Avatar = Cast<ACharacter>(GetAvatarActorFromActorInfo());
-	UMotionWarpingComponent* Warp = Avatar ? Avatar->FindComponentByClass<UMotionWarpingComponent>() : nullptr;
-	if (!Avatar || !Warp)
-	{
-		return;
-	}
-
-	// Candidates: living combatants, not self; AI attackers never snap onto fellow AI
-	// (same faction rule as the damage path).
-	const APawn* AvatarPawn = Cast<APawn>(Avatar);
-	const bool bAttackerIsAI = AvatarPawn && !AvatarPawn->IsPlayerControlled();
-	TArray<FVector> Locations;
-	for (TActorIterator<APawn> It(Avatar->GetWorld()); It; ++It)
-	{
-		APawn* Candidate = *It;
-		if (Candidate == Avatar || !Candidate->Implements<UMACombatantInterface>())
-		{
-			continue;
-		}
-		if (bAttackerIsAI && !Candidate->IsPlayerControlled())
-		{
-			continue;
-		}
-		if (const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Candidate))
-		{
-			if (ASC->HasMatchingGameplayTag(MAGameplayTags::State_Dead))
-			{
-				continue;
-			}
-		}
-		Locations.Add(Candidate->GetActorLocation());
-	}
-
 	FMALungeParams Params;
 	Params.ConeHalfAngleDeg = ConeHalfAngleDeg;
 	Params.MaxLungeDistanceCm = MaxLungeDistanceCm;
 	Params.StopDistanceCm = StopDistanceCm;
-
-	const float AimYaw = AvatarPawn ? AvatarPawn->GetBaseAimRotation().Yaw : Avatar->GetActorRotation().Yaw;
-	const FVector MyPos = Avatar->GetActorLocation();
-	const int32 Pick = MAAttackLunge::PickLungeTarget(MyPos, AimYaw, Locations, Params);
-
-	FVector WarpPoint;
-	FRotator FaceRot(0.f, AimYaw, 0.f);
-	if (Pick != INDEX_NONE)
-	{
-		WarpPoint = MAAttackLunge::ComputeWarpPoint(MyPos, Locations[Pick], StopDistanceCm);
-		FVector To = Locations[Pick] - MyPos;
-		To.Z = 0.f;
-		if (To.Normalize())
-		{
-			FaceRot = To.Rotation();
-		}
-	}
-	else
-	{
-		const FVector Fwd(FMath::Cos(FMath::DegreesToRadians(AimYaw)), FMath::Sin(FMath::DegreesToRadians(AimYaw)), 0.f);
-		WarpPoint = MyPos + Fwd * NoTargetDashCm; // a whiff is a short hop, not the full authored dash
-	}
-	Warp->AddOrUpdateWarpTargetFromLocationAndRotation(WarpTargetName, WarpPoint, FaceRot);
+	MAWarpOps::SetupWarpTargetForAbility(this, WarpTargetName, Params, NoTargetDashCm);
 }
 
 void UGA_DashSlash::ClearWarpTarget()
 {
-	if (ACharacter* Avatar = Cast<ACharacter>(GetAvatarActorFromActorInfo()))
-	{
-		if (UMotionWarpingComponent* Warp = Avatar->FindComponentByClass<UMotionWarpingComponent>())
-		{
-			Warp->RemoveWarpTarget(WarpTargetName);
-		}
-	}
+	MAWarpOps::ClearWarpTarget(this, WarpTargetName);
 }
 
 void UGA_DashSlash::OnHitEvent(FGameplayEventData EventData)

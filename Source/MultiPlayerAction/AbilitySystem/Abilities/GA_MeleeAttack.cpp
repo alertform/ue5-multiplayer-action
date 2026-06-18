@@ -3,12 +3,15 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "AbilitySystemComponent.h"
-#include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystem/MAGameplayTags.h"
 #include "Engine/World.h"
 #include "MultiPlayerActionCharacter.h"
 #include "TimerManager.h"
+#include "Combat/MAAttackLunge.h"
 #include "Combat/MAMeleeHitOps.h"
+#include "Combat/MAWarpOps.h"
+
+const FName UGA_MeleeAttack::WarpTargetName(TEXT("AttackTarget"));
 
 UGA_MeleeAttack::UGA_MeleeAttack()
 {
@@ -62,6 +65,10 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	// No actor rotation here: the upper body visually turns toward the camera via the
 	// AnimInstance spine twist (gated on our owned State.Attacking), the legs keep
 	// following orient-to-movement, and PerformHitTrace aims with the camera yaw directly.
+
+	// First swing's lunge target — re-resolved per chained swing in TryAdvanceCombo. Must run
+	// before the montage so the section's AttackTarget warp window has its target on frame one.
+	SetupWarpTarget();
 
 	// Play montage at configurable rate (default 2.0x — see MontagePlayRate UPROPERTY)
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
@@ -168,9 +175,23 @@ void UGA_MeleeAttack::TryAdvanceCombo()
 	--BufferedComboPresses; // consume one queued press per chained swing
 	bComboWindowOpen = false; // the next section's own notify re-opens it
 
+	// Re-aim this swing's lunge at the current foe before the new section's warp window opens.
+	// Runs on client (prediction) and server alike — both sides resolve from their own world
+	// state, yielding the same small, prediction-measurable corrections as the dash slash.
+	SetupWarpTarget();
+
 	// Routes through the ASC's montage control: section change replicates via
 	// FGameplayAbilityRepAnimMontage — no custom replication.
 	MontageJumpToSection(ComboSections[ComboIndex]);
+}
+
+void UGA_MeleeAttack::SetupWarpTarget()
+{
+	FMALungeParams Params;
+	Params.ConeHalfAngleDeg = ConeHalfAngleDeg;
+	Params.MaxLungeDistanceCm = MaxLungeDistanceCm;
+	Params.StopDistanceCm = StopDistanceCm;
+	MAWarpOps::SetupWarpTargetForAbility(this, WarpTargetName, Params, NoTargetDashCm);
 }
 
 void UGA_MeleeAttack::OnMontageEvent(FGameplayEventData EventData)
@@ -181,6 +202,16 @@ void UGA_MeleeAttack::OnMontageEvent(FGameplayEventData EventData)
 void UGA_MeleeAttack::OnMontageEnded()
 {
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	bool bReplicateEndAbility, bool bWasCancelled)
+{
+	// Drop the warp target so a stale lunge point can't bleed into the next, unwarped activation.
+	MAWarpOps::ClearWarpTarget(this, WarpTargetName);
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo)
