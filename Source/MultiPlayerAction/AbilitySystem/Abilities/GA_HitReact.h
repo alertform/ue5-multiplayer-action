@@ -27,6 +27,11 @@ public:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility, bool bWasCancelled) override;
+
 protected:
 	/** React montage pool — the server picks one at random per hit (selection replicates
 	 *  implicitly through the ASC montage path). Configure in BP defaults (Hit_A/Hit_B). */
