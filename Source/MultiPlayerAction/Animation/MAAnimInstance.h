@@ -46,9 +46,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Locomotion")
 	float Direction = 0.f;
 
-	/** True when moving fast enough AND far enough off the facing axis to use the strafe set —
-	 *  the locked-on sidestep / backpedal case. Gates the AnimGraph's BlendPosesByBool between the
-	 *  free-run blendspace and the strafe blendspace. */
+	/** True when the owner is in lock-on strafe mode AND moving — gates the AnimGraph's
+	 *  BlendPosesByBool between the orient-to-movement free-run blendspace (false) and the 8-way
+	 *  strafe blendspace (true). Driven by the replicated AMultiPlayerActionCharacter::IsStrafeMode
+	 *  flag plus a speed gate, so it stays correct on simulated proxies. */
 	UPROPERTY(BlueprintReadOnly, Category = "Locomotion")
 	bool bStrafing = false;
 
@@ -65,13 +66,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Aim", meta = (ClampMin = "1", UIMax = "5"))
 	int32 NumSpineBones = 3;
 
-	/** Min planar speed (cm/s) before strafe can engage — filters idle jitter into bStrafing. */
+	/** Min planar speed (cm/s) before strafe can engage — keeps a locked-on but near-stationary
+	 *  character on the idle/free-run pose instead of a zero-speed strafe. */
 	UPROPERTY(EditDefaultsOnly, Category = "Locomotion", meta = (ClampMin = "0.0"))
 	float StrafeSpeedThreshold = 10.f;
-
-	/** |Direction| beyond this (deg) counts as strafing rather than a forward run. */
-	UPROPERTY(EditDefaultsOnly, Category = "Locomotion", meta = (ClampMin = "0.0", UIMax = "90.0"))
-	float StrafeDirectionThreshold = 25.f;
 
 private:
 	/** Smoothed full-chain yaw delta */

@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "KismetAnimationLibrary.h"
+#include "MultiPlayerActionCharacter.h"
 
 void UMAAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
@@ -33,20 +34,22 @@ void UMAAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 				bFalling = Movement->IsFalling();
 			}
 
-			// 8-way strafe inputs. CalculateDirection gives the signed velocity-vs-facing angle;
-			// strafe engages only when moving meaningfully off the facing axis (the locked-on
-			// sidestep / backpedal). Both velocity and rotation replicate, so sim proxies match.
+			// 8-way strafe inputs. CalculateDirection gives the signed velocity-vs-facing angle,
+			// which drives the strafe blendspace's X axis (0 ahead, ±90 sidestep, ±180 backpedal).
 			const FVector Velocity = CharacterOwner->GetVelocity();
 			Direction = UKismetAnimationLibrary::CalculateDirection(Velocity, CharacterOwner->GetActorRotation());
 
-			// Hysteresis on the gate: once strafing, hold it through a lower exit band so the
-			// AnimGraph BlendPosesByBool doesn't dither when speed/angle hover at the entry
-			// thresholds (the AnimGraph node's blend time is the primary smoother; this mirrors
-			// the aim-twist's FInterpTo and keeps the *choice* of blendspace stable too).
-			constexpr float ExitBand = 0.7f; // exit thresholds = entry * 0.7
+			// The strafe set is gated by the replicated lock-on flag, not by geometry: while locked
+			// on the body faces the target, so EVERY movement direction (including straight forward)
+			// belongs in the 8-way strafe set, with Direction picking the compass clip. The flag
+			// replicates (COND_SkipOwner), so simulated proxies strafe in sync. A speed gate with a
+			// lower exit band (hysteresis) keeps a locked-on but near-stationary character on the
+			// idle/free-run pose instead of dithering into a zero-speed strafe.
+			const AMultiPlayerActionCharacter* MACharacter = Cast<AMultiPlayerActionCharacter>(PawnOwner);
+			const bool bStrafeMode = MACharacter && MACharacter->IsStrafeMode();
+			constexpr float ExitBand = 0.7f; // exit threshold = entry * 0.7
 			const float SpeedGate = StrafeSpeedThreshold * (bStrafing ? ExitBand : 1.f);
-			const float DirGate = StrafeDirectionThreshold * (bStrafing ? ExitBand : 1.f);
-			bStrafing = Velocity.Size2D() > SpeedGate && FMath::Abs(Direction) > DirGate;
+			bStrafing = bStrafeMode && Velocity.Size2D() > SpeedGate;
 		}
 
 		// ASC lives on the PlayerState for players (character forwards via IAbilitySystemInterface);

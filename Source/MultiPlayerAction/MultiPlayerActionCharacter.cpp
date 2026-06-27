@@ -24,6 +24,7 @@
 #include "TimerManager.h"
 #include "Network/MALagCompSubsystem.h"
 #include "Network/MAPredictionMovementComponent.h"
+#include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -237,8 +238,38 @@ AMultiPlayerActionCharacter::AMultiPlayerActionCharacter(const FObjectInitialize
 	// Bends the dash slash's authored root motion onto its warp target (GA_DashSlash).
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarping"));
 
-	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
+	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character)
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+}
+
+void AMultiPlayerActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	// Skip the owner: the locally-controlled client sets bStrafeMode itself in SetStrafeMode, so the
+	// server only needs to push it out to the simulated proxies that can't see the local lock-on.
+	DOREPLIFETIME_CONDITION(AMultiPlayerActionCharacter, bStrafeMode, COND_SkipOwner);
+}
+
+void AMultiPlayerActionCharacter::SetStrafeMode(bool bEnabled)
+{
+	if (bStrafeMode == bEnabled)
+	{
+		return;
+	}
+
+	// Apply locally first (host authority, or owning-client prediction) so the local anim reacts
+	// immediately; off the server, hand the authoritative write to the server, which replicates.
+	bStrafeMode = bEnabled;
+	if (!HasAuthority())
+	{
+		ServerSetStrafeMode(bEnabled);
+	}
+}
+
+void AMultiPlayerActionCharacter::ServerSetStrafeMode_Implementation(bool bEnabled)
+{
+	bStrafeMode = bEnabled;
 }
 
 //////////////////////////////////////////////////////////////////////////

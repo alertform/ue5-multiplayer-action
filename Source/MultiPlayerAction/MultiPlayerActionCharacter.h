@@ -196,7 +196,29 @@ public:
 	UFUNCTION(Exec)
 	void LockOnSwitch(float Direction = 1.f);
 
+	/** True while the local player holds a lock-on: locomotion uses the 8-way strafe set (body
+	 *  faces the target) instead of orient-to-movement free-run. Replicated to simulated proxies so
+	 *  other clients see the strafe; predicted locally on the owner (COND_SkipOwner). Read by
+	 *  UMAAnimInstance to gate bStrafing. */
+	UFUNCTION(BlueprintPure, Category = "Locomotion")
+	bool IsStrafeMode() const { return bStrafeMode; }
+
+	/** Drive strafe mode from the locally-controlled client (LockOnComponent on lock / release).
+	 *  Applies locally for immediate feedback and, off the server, forwards to the authority which
+	 *  replicates the flag to the other clients. */
+	void SetStrafeMode(bool bEnabled);
+
 protected:
+
+	/** Replicated strafe gate — see IsStrafeMode(). Authority + simulated proxies only; the owning
+	 *  client predicts it locally (COND_SkipOwner) so its own anim reacts without a round trip. */
+	UPROPERTY(Replicated)
+	bool bStrafeMode = false;
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetStrafeMode(bool bEnabled);
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void NotifyControllerChanged() override;
 

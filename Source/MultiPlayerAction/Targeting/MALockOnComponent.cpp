@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "MultiPlayerActionCharacter.h"
 #include "GameFramework/PlayerController.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
@@ -143,6 +144,12 @@ void UMALockOnComponent::SetLock(AActor* NewTarget)
 		}
 		bSavedUseControllerYaw = C->bUseControllerRotationYaw;
 		C->bUseControllerRotationYaw = true;
+
+		// Tell the locomotion layer to switch to the 8-way strafe set (replicates to proxies).
+		if (AMultiPlayerActionCharacter* MAC = Cast<AMultiPlayerActionCharacter>(C))
+		{
+			MAC->SetStrafeMode(true);
+		}
 	}
 
 	AdoptTarget(NewTarget);
@@ -170,6 +177,12 @@ void UMALockOnComponent::ClearLock()
 			Move->bOrientRotationToMovement = bSavedOrientToMovement;
 		}
 		C->bUseControllerRotationYaw = bSavedUseControllerYaw;
+
+		// Back to orient-to-movement free-run locomotion.
+		if (AMultiPlayerActionCharacter* MAC = Cast<AMultiPlayerActionCharacter>(C))
+		{
+			MAC->SetStrafeMode(false);
+		}
 	}
 
 	if (Reticle)
