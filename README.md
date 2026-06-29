@@ -1,6 +1,6 @@
 # ue5-multiplayer-action
 
-Lyra-style multiplayer action demo built on Unreal Engine 5.5 — full **Gameplay Ability System** (GAS) stack, a sword-combo combat kit (3-hit chains, block, staggers, authored deaths), a complete **deathmatch loop** (K/D, kill feed, scoreboard, win conditions, auto-restart), and AI driven by **BehaviorTree** sharing the same `GameplayAbility` C++ classes as the player. Personal portfolio project.
+Lyra-style multiplayer action demo built on Unreal Engine 5.5 — full **Gameplay Ability System** (GAS) stack, a **katana combat kit** (4-stage root-motion combos with per-swing Motion Warping, lock-on, block/parry, staggers, authored deaths, a Motion-Warped dash-slash), **server-side lag compensation** plus prediction-correction metrics and a hit-feel pass, a complete **deathmatch loop** (K/D, kill feed, scoreboard, win conditions, auto-restart), and AI driven by **BehaviorTree** — sharing the same `GameplayAbility` C++ classes as the player and coordinated by a server attack-token director. Backed by a headless UE Automation test suite. Personal portfolio project.
 
 > Built alongside (and largely *with*) **UnrealAgentMCP** — a self-developed in-editor MCP server (59 tools / 64 automation tests) that lets an AI agent author Blueprints, UMG, AnimGraphs, BehaviorTrees, montages, IK retargeting and level content directly inside the running editor. Most of this project's content-side work was authored agent-side through it. The plugin is developed in a separate **private** repo (demo available on request); it is not required to build or run this project.
 
@@ -16,17 +16,24 @@ Lyra-style multiplayer action demo built on Unreal Engine 5.5 — full **Gamepla
 
 | Area | What's in |
 |---|---|
-| **GAS 5 pillars** | `GameplayAbility` (LocalPredicted ×5: Melee-combo / Sprint / Dodge / Fireball / Block + ServerInitiated HitReact) · `GameplayEffect` (Damage Execution / Cooldown / Stamina Cost / Periodic Stamina Regen) · `AttributeSet` (Health/MaxHealth/Stamina/AttackPower/Armor + Damage meta) · `GameplayCue` (`Static` notify w/ `FHitResult` location/normal + data-driven C++ burst cue base) · `PredictionKey` |
-| **3-hit sword combo** | One ability instance + one multi-section montage. Re-presses while swinging buffer through the **GAS generic replicated `InputPressed` event** (`AbilityLocalInputPressed` InputID routing) — a press QUEUE, so N mashes yield N chained swings on client AND server with no custom RPC. Each section's `ComboWindow` notify opens a **window-period**: queued presses chain at open, later presses chain instantly (recovery cancel) via `MontageJumpToSection` — section state replicates through `FGameplayAbilityRepAnimMontage`, so a misprediction corrects as a within-montage section snap, never an ability rollback. |
-| **Defense & reactions** | **Hold-to-block** (RMB): `State.Blocking` gates a 70% mitigation read from captured target tags inside the damage ExecCalc; a looping guard-stance montage holds the pose and each absorbed hit overlays a block-hit react. **Staggers**: `GA_HitReact` (ServerInitiated, triggered by a `Event.Damage.Taken` gameplay event raised in the AttributeSet, `bRetriggerInstancedAbility`) — every hit flinches and interrupts the victim's combo; suppressed while blocking/casting/dodging. |
+| **GAS 5 pillars** | `GameplayAbility` (LocalPredicted ×6: Melee-combo / Sprint / Dodge / Fireball / Block / Dash-slash + ServerInitiated HitReact) · `GameplayEffect` (Damage Execution / Cooldown / Stamina Cost / Periodic Stamina Regen) · `AttributeSet` (Health/MaxHealth/Stamina/AttackPower/Armor + Damage meta) · `GameplayCue` (`Static` notify w/ `FHitResult` location/normal + data-driven C++ burst cue base) · `PredictionKey` |
+| **Katana combo (4-stage)** | One ability instance + one multi-section **full-body root-motion** montage (`AM_KatanaCombo_GS`). Re-presses while swinging buffer through the **GAS generic replicated `InputPressed` event** (`AbilityLocalInputPressed` InputID routing) — a press QUEUE, so N mashes yield N chained swings on client AND server with no custom RPC. Each section's `ComboWindow` notify opens a **window-period**: queued presses chain at open, later presses chain instantly (recovery cancel) via `MontageJumpToSection` — section state replicates through `FGameplayAbilityRepAnimMontage`, so a misprediction corrects as a within-montage section snap, never an ability rollback. Each swing carries a per-section **Motion Warping** window that lunges onto the locked/cone target via the shared `MAAttackLunge`/`MAWarpOps` helper (whiff distance-capped). |
+| **Defense & reactions** | **Hold-to-block** (RMB): `State.Blocking` gates a 70% mitigation read from captured target tags inside the damage ExecCalc; a **full-body katana guard loop** (`AM_KatanaGuardLoop`) holds the pose and each absorbed hit overlays a parry react (`AM_KatanaGuardHit`). **Staggers**: `GA_HitReact` (ServerInitiated, triggered by a `Event.Damage.Taken` gameplay event raised in the AttributeSet, `bRetriggerInstancedAbility`) — every hit flinches and interrupts the victim's combo; suppressed while blocking/casting/dodging. |
+| **Lock-on & 8-way strafe** | `UMALockOnComponent` soft-lock (**R3 / Middle-Mouse** toggle, right-stick flick switches target) — the locked target replicates, so simulated proxies strafe correctly. While locked, `UMAAnimInstance` derives `Direction` + `bStrafing` from replicated velocity-vs-facing and `BlendPosesByBool` into an **8-way katana strafe blendspace** (`BS_Katana_Strafe`: X = direction −180..180, Y = speed walk→run with Y-axis play-rate scaling) over a katana combat idle. |
+| **Dash-slash (Motion Warping)** | `UGA_DashSlash` (`ma.DashSlash`, **E / gamepad RB**): a root-motion katana dash warped onto the aim/locked target via the shared `MAAttackLunge::PickLungeTarget` → `MAWarpOps` SkewWarp setup — the **same helper drives per-swing combo warp**, so both resolve identically on client and server. A whiffed dash plays its authored step-in, capped at a forward no-target distance. |
 | **Authored deaths** | Death clips play single-node (bypassing the ABP, no montage slot), then **hand the corpse to ragdoll as the clip ends** — physics settles the in-place final pose onto the ground. AI corpses stop thinking (brain stop + blackboard wipe — no posthumous target tracking, no phantom attack on respawn). |
 | **Deathmatch loop** | Engine **MatchState machine** (no hand-rolled phase enum): replicated match clock / kill target / verdict on `AMAGameState`, countdowns derived from `GetServerWorldTimeSeconds` (zero per-second RPCs). Kill attribution flows from the **effect-context instigator** through `CheckDeath` into the GameMode's kill router — suicides count the death but never the kill. K/D live on PlayerState; kills broadcast via `NetMulticast` → local delegate into a **kill feed** and the victim's "KILLED BY" line. Hold-**Tab** scoreboard doubles as the pinned post-match results (gold winner row, restart countdown); `RestartGame()` reloads the map — fresh scores, the LAN session survives on the GameInstance. |
-| **Weapon & animation set** | KayKit (CC0) sword on a `hand_r` bone socket + 76 KayKit clips **IK-retargeted to the UE5 Manny skeleton through a fully programmatic pipeline** (auto-characterize → anatomical chain alignment → exact T-pose retarget pose from per-bone local deltas → finger track strip), productized as the MCP plugin's `retarget_animations` tool. |
+| **Server-side lag compensation** | `UMALagCompSubsystem` (`UTickableWorldSubsystem`) records every combatant's capsule into a per-frame **time ring buffer**; the melee hit path (`MAMeleeHitOps`, gated on `ma.LagComp.Enabled`) rewinds targets to the attacker's client-seen moment (ping + interpolation delay) and runs a **swept-sphere-vs-capsule** geometric intersection, with a **favor-the-shooter** rewind cap (`ma.LagComp.MaxRewindSeconds` 0.3). Pure-geometry core, fully unit-tested. |
+| **Prediction-correction metrics** | `UMAPredictionMovementComponent` subclasses the CMC and overrides `OnClientCorrectionReceived` to measure server reconciliation (correction frequency + position error) into a pure `FMACorrectionTracker`; `ma.PredDebug` draws an on-screen readout and a **red/green ghost** of the pre/post-correction transforms (`ma.PredDebug.GhostSeconds` 2.0). |
+| **Hit feel** | `MAHitFeel` (`ma.HitFeel` master toggle): **hit-stop** by briefly freezing the mesh anim rate — never global time dilation, the rest of the sim keeps running — plus weight-scaled **camera shake** (`MACameraShakes` light/heavy), impact SFX and knockback, fired through the `GCN_MeleeImpact` cue. |
+| **AI combat director** | Server-only `UMACombatDirectorSubsystem` hands out a bounded number of **attack tokens** (`MAAttackTokenLedger`, `ma.AI.MaxAttackers` 1, `ma.AI.TokenTTL` 3s) so swarming AI take turns instead of gang-piling: `BTTask_ClaimAttackToken`/`ReleaseAttackToken` gate the melee node, `BTTask_CircleTarget` circle-strafes while waiting. `MAAIDefenseComponent` + `MAAIDefensePolicy` raise a guard on incoming swings by activating the **same `GA_Block`** the player uses; AI are faction-immune to each other. Ledger + policy are pure, unit-tested. |
+| **Automated test suite** | ~10 UE Automation tests over the pure cores — `MultiPlayerAction.LagComp.*` (segment distance, swept-sphere-vs-capsule, snapshot interpolation, sample history, rewound-hit resolve), `.AICombat.*` (token ledger, defense policy), `.Lunge.TargetSelection`, `.Prediction.CorrectionTracker`, `.HitFeel.ComputeHitFeel` — the geometry/statistics/ledger logic is engine-independent and runs headless. |
+| **Weapon & animation set** | Katana on a `hand_r` socket + the **GhostSamurai** clip set (4-stage attack root-motion, 16-way walk/run strafe, guard loop + parry, idle) **IK-retargeted UE4→UE5 onto the Manny skeleton through a fully programmatic pipeline** (`IK_UE4Manny` + `RTG_UE4Manny_to_UE5`: auto-characterize → anatomical chain alignment → exact T-pose retarget pose from per-bone local deltas → finger-track strip), productized as the MCP plugin's `retarget_animations` tool. The KayKit sword kit it superseded was removed once unreferenced. |
 | **Projectile netcode** | Lyra/GASShooter-style ranged AoE: predicted cast montage (instant client feedback) + **server-only spawn** of a replicated `AMAProjectile` carrying a damage spec **snapshotted at cast time** — the fireball lands with cast-time stats even if the caster dies mid-flight. AoE overlap applies the same ExecCalc to every ASC in radius; explosion FX replicate via GameplayCue. |
 | **Damage formula** | `UGameplayEffectExecutionCalculation` capturing source `AttackPower` (snapshot) + target `Armor` (live), output to `Damage` meta-attribute, AS routes to `Health`. Lyra `ULyraDamageExecution` pattern. |
 | **HUD architecture** | Self-contained C++ Views auto-wired by `UMAUserWidget::InitFromASC` tree scan: `UMAHealthBarWidget` (Street-Fighter-style **chip damage bar** — front fill drops instantly, a chip segment accumulates hits for 3 s then drains; styles force-built in `NativePreConstruct`) and `UMASkillSlotWidget` (cooldown sweep from active cooldown GE query + active-tag highlight). The **same chip-bar widget** doubles as the NPC overhead bar (`bHideUntilDamaged` — appears on first blood, drains and vanishes on death, re-hides at full). The match UI layer (clock/K-D overlay, kill feed, scoreboard) is **entirely code-built** — `WidgetTree::ConstructWidget` in C++, spawned straight from the class, zero BP assets. |
-| **Animation** | Upper-body layering rig in `ABP_Manny` (cached full pose → `UpperBody` slot → layered blend per bone on `spine_01`) keeps the legs running while attack/cast montages play. `UMAAnimInstance` adds a **torso aim twist**: while `State.Attacking`/`State.Casting` is on the ASC, the spine chain rotates toward the camera yaw (clamped ±90°, interp-smoothed) — legs keep orient-to-movement, body language follows the crosshair. |
-| **AI** | `BehaviorTree` + custom `UBTService_UpdateTargetInfo` (nearest **living** player, preferring **NavMesh-reachable** targets over closer unreachable ones) + custom `UBTTask_TryActivateAbilityByTag` (BT node → `ASC.TryActivateAbilitiesByTag`). AI calls the **same `UGA_MeleeAttack` C++ class** the player drives via Enhanced Input. |
+| **Animation** | Upper-body layering rig in `ABP_Manny` (cached full pose → `UpperBody` slot → layered blend per bone on `spine_01`) keeps the legs running under the **fireball cast** (the katana combo / guard / dash are full-body root-motion DefaultSlot montages). `UMAAnimInstance` adds a **torso aim twist**: while `State.Attacking`/`State.Casting` is on the ASC, the spine chain rotates toward the camera yaw (clamped ±90°, interp-smoothed) — legs keep orient-to-movement, body language follows the crosshair. |
+| **AI** | `BehaviorTree` + custom `UBTService_UpdateTargetInfo` (nearest **living** player, preferring **NavMesh-reachable** targets over closer unreachable ones) + custom `UBTTask_TryActivateAbilityByTag` (BT node → `ASC.TryActivateAbilitiesByTag`). AI drives the **same `UGA_MeleeAttack` katana class** the player uses via Enhanced Input, coordinated by the attack-token director (claim → circle → release). |
 | **Session front-end** | `UMASessionSubsystem` (GameInstance subsystem over the OnlineSubsystem session interface) with a UMG **MVVM** main menu — `UMAMainMenuViewModel` + FieldNotify bindings, ListView of discovered sessions, host/join/refresh with in-flight guards and network-failure recovery back to the menu. |
 | **Networking** | Server-authoritative damage; `Mixed` ASC replication for players (cooldown to owner) + `Minimal` for NPCs. `NetMulticast` RPCs for death visuals and kill events (component state doesn't auto-replicate). `Server`/`Client` RPCs for dev cheats and the respawn countdown deadline. |
 | **Death/Respawn** | `IMACombatantInterface` abstraction; `State.Dead` loose tag gates re-activation; `UnPossess()` before `GameMode->RestartPlayer()` to force fresh pawn spawn (vs the engine's default teleport-existing). The owning client renders a respawn countdown off a server-time deadline pushed once over a `Client` RPC. |
@@ -180,18 +187,33 @@ Source/MultiPlayerAction/
 │   │   └── AN_SendGameplayEvent.{h,cpp}   Montage notify → SendGameplayEventToActor
 │   ├── Abilities/
 │   │   ├── MAGameplayAbilityBase.{h,cpp}  Base for all GAs (LocalPredicted + InstancedPerActor defaults)
-│   │   ├── GA_MeleeAttack.{h,cpp}         3-hit combo: replicated press queue + window-period section jumps + sphere trace
+│   │   ├── GA_MeleeAttack.{h,cpp}         4-stage katana combo: replicated press queue + window jumps + per-swing warp + sweep
 │   │   ├── GA_HitReact.{h,cpp}            ServerInitiated stagger — GameplayEvent-triggered, retriggerable per hit
 │   │   ├── GA_Block.{h,cpp}               Hold guard: State.Blocking (70% ExecCalc mitigation) + stance loop/absorb montages
 │   │   ├── GA_Sprint.{h,cpp}              Hold-to-activate sprint, periodic Stamina drain, auto-end on Stamina=0
 │   │   ├── GA_Dodge.{h,cpp}               Dash + i-frame via State.Dodging ActivationOwnedTags (GE IgnoreTags)
-│   │   └── GA_Fireball.{h,cpp}            Predicted cast + server-authoritative projectile spawn (cast-time spec snapshot)
+│   │   ├── GA_Fireball.{h,cpp}            Predicted cast + server-authoritative projectile spawn (cast-time spec snapshot)
+│   │   └── GA_DashSlash.{h,cpp}           Motion-Warped root-motion katana dash (shares MAAttackLunge/MAWarpOps)
 │   ├── Cues/
 │   │   └── GCN_ParticleBurst.{h,cpp}      Data-driven burst cue base — BP children are pure config, no graphs
 │   └── Executions/
 │       └── MADamageExecutionCalculation.{h,cpp}   Lyra-style formula (AP snapshot × armor scale × block mitigation)
 ├── Combat/
-│   └── MAProjectile.{h,cpp}               Server-authoritative replicated projectile: AoE overlap → spec → cue → destroy
+│   ├── MAProjectile.{h,cpp}               Server-authoritative replicated projectile: AoE overlap → spec → cue → destroy
+│   ├── MAMeleeHitOps.{h,cpp}              Shared melee sphere-sweep + lag-comp rewind entry point
+│   ├── MAAttackLunge.{h,cpp}              Warp-target selection (cone / locked pick, whiff cap) — unit-tested
+│   ├── MAWarpOps.{h,cpp}                  Motion Warping SkewWarp window setup (combo + dash share it)
+│   ├── MAHitFeel.{h,cpp}                  Hit-stop (mesh freeze) + knockback + SFX (ma.HitFeel)
+│   └── MACameraShakes.{h,cpp}             Light / heavy weight-scaled camera shakes
+├── Targeting/
+│   └── MALockOnComponent.h                Soft lock-on: target pick / cycle, replicated current target
+├── Network/
+│   ├── MALagCompTypes.h                   Snapshot / history POD types
+│   ├── MALagCompGeometry.{h,cpp}          Pure swept-sphere-vs-capsule + segment distance (unit-tested)
+│   ├── MALagCompSubsystem.{h,cpp}         Per-frame capsule ring buffer + ping rewind (ma.LagComp.*)
+│   ├── MAPredictionTypes.h                Correction-sample POD types
+│   ├── MACorrectionTracker.{h,cpp}        Pure reconciliation stats — freq + position error (unit-tested)
+│   └── MAPredictionMovementComponent.{h,cpp}  CMC subclass: OnClientCorrectionReceived metrics + ghost (ma.PredDebug)
 ├── Player/
 │   ├── MAPlayerState.{h,cpp}              Owns ASC + AttributeSet; replicated Kills/Deaths (BlueprintPure accessors)
 │   └── MAPlayerController.{h,cpp}         Owns all local UI (HUD/match overlay/scoreboard/kill feed); respawn timer + RPCs
@@ -208,25 +230,40 @@ Source/MultiPlayerAction/
 │   ├── MAScoreboardWidget.{h,cpp}         Code-built hold-Tab standings / pinned post-match results (pooled rows)
 │   ├── MAKillFeedWidget.{h,cpp}           Code-built top-right kill feed (GameState kill event, timed line expiry)
 │   └── MainMenu/                          MVVM front-end: MAMainMenuViewModel/Widget, MASessionListEntryVM/RowWidget
-└── AI/
-    ├── MATargetDummy.{h,cpp}              Pawn-owned ASC (Minimal rep), AI possess, overhead chip bar, death lifecycle
-    ├── MAEnemyController.{h,cpp}          AAIController + RunBehaviorTree on possess
-    ├── BTTask_TryActivateAbilityByTag.{h,cpp}    BT task: ASC.TryActivateAbilitiesByTag(AbilityTag)
-    └── BTService_UpdateTargetInfo.{h,cpp}        BT service: nearest living player, reachability-preferred
+├── AI/
+│   ├── MATargetDummy.{h,cpp}              Pawn-owned ASC (Minimal rep), AI possess, overhead chip bar, death lifecycle
+│   ├── MAEnemyController.{h,cpp}          AAIController + RunBehaviorTree on possess
+│   ├── BTTask_TryActivateAbilityByTag.{h,cpp}    BT task: ASC.TryActivateAbilitiesByTag(AbilityTag)
+│   ├── BTService_UpdateTargetInfo.{h,cpp}        BT service: nearest living player, reachability-preferred
+│   ├── BTTask_ClaimAttackToken.{h,cpp}           BT task: request an attack token from the director
+│   ├── BTTask_ReleaseAttackToken.{h,cpp}         BT task: return the attack token
+│   ├── BTTask_CircleTarget.{h,cpp}               BT task: circle-strafe the target while unticketed
+│   └── Combat/
+│       ├── MACombatDirectorSubsystem.{h,cpp}     Server token broker (ma.AI.MaxAttackers / TokenTTL)
+│       ├── MAAttackTokenLedger.{h,cpp}           Pure attack-slot ledger (unit-tested)
+│       ├── MAAIDefensePolicy.{h,cpp}             Pure "block this swing?" policy (unit-tested)
+│       └── MAAIDefenseComponent.{h,cpp}          Event-driven guard: activates the player's GA_Block
+└── Tests/
+    ├── MALagCompGeometryTest.cpp          MultiPlayerAction.LagComp.* (5 geometry / history tests)
+    ├── MAAttackLungeTest.cpp              MultiPlayerAction.Lunge.TargetSelection
+    ├── MACorrectionTrackerTest.cpp        MultiPlayerAction.Prediction.CorrectionTracker
+    ├── MAHitFeelTest.cpp                  MultiPlayerAction.HitFeel.ComputeHitFeel
+    ├── MAAttackTokenLedgerTest.cpp        MultiPlayerAction.AICombat.TokenLedger
+    └── MAAIDefensePolicyTest.cpp          MultiPlayerAction.AICombat.DefensePolicy
 ```
 
 Content (BP / assets) under `Content/`:
-- `AbilitySystem/Abilities/` — `BP_GA_MeleeAttack`, `BP_GA_Sprint`, `BP_GA_Dodge`, `BP_GA_Fireball`, `BP_GA_HitReact`, `BP_GA_Block`
+- `AbilitySystem/Abilities/` — `BP_GA_MeleeAttack`, `BP_GA_Sprint`, `BP_GA_Dodge`, `BP_GA_Fireball`, `BP_GA_HitReact`, `BP_GA_Block`, `BP_GA_DashSlash`
 - `AbilitySystem/GE/` — `BP_GE_Damage` (uses `MADamageExecutionCalculation`), `BP_GE_Cooldown_Melee`/`_Dodge`/`_Fireball`, `BP_GE_StaminaCost`/`_Fireball`, `BP_GE_StaminaRegen` (Periodic, OngoingTagRequirements suppresses during sprint)
 - `AbilitySystem/Cues/` — `BP_GCN_MeleeHit` (`GameplayCueNotify_Static`, P_Sparks at `FHitResult.ImpactPoint`), `BP_GCN_FireballExplosion` (`GCN_ParticleBurst` child — pure data, no graph)
-- `AbilitySystem/AM_Montage/` — `AM_SwordComboUB` (3 dead-end combo sections + hit/window notifies), `AM_FireballCastUB`, `AM_HitReactA/B_UB`, `AM_BlockLoopUB` (self-linked looping stance), `AM_BlockHitUB` — all UpperBody-slot, all authored via the MCP `create_anim_montage` tool
-- `AnimLibrary/` — KayKit Knight clip library (76 clips) + `Manny/` IK-retargeted set used by the sword combo / blocks / reacts / deaths
+- `AbilitySystem/AM_Montage/` — `AM_KatanaCombo_GS` (4 dead-end combo sections + per-swing hit / window / Motion-Warp notifies, full-body root motion), `AM_KatanaGuardLoop` / `AM_KatanaGuardHit` (katana block stance + parry), `AM_FireballCastUB`, `AM_HitReactA/B_UB` — authored via the MCP `create_anim_montage` tool
+- `AnimLibrary/GhostSamurai/` — UE4→UE5 retarget rigs (`IK_UE4Manny`, `RTG_UE4Manny_to_UE5`) + the retargeted katana set: `Attack01_1..4_*_Root_GS` (combo), `DefenseR_Loop`/`Hit_Inplace_GS` (guard), `SPAttack03_Root` (dash), 16 `Strafe_{Walk,Run}_{F,FL,FR,L,R,B,BL,BR}` clips + `Movement/BS_Katana_Strafe`, and the katana idle
 - `Characters/Mannequins/Animations/ABP_Manny` — upper-body layered blend rig + spine aim-twist chain (authored node-by-node via MCP AnimGraph tools)
-- `Weapons/` — KayKit (CC0) sword static mesh on the character's `hand_r`
+- the weapon mesh rides the character's `hand_r` socket (`WeaponMesh` component, BP-assigned)
 - `Blueprints/Combat/` — `BP_Projectile_Fireball` (visuals on top of `AMAProjectile`)
 - `Blueprints/AI/` — `BP_TargetDummy`, `BP_EnemyController`
 - `AI/` — `BB_Enemy` (Blackboard), `BT_Enemy` (BehaviorTree)
-- `Blueprints/UI/` — `WBP_HUD` (chip health bar + 5-slot skill bar), `WBP_SkillSlot`, `WBP_MainMenu` (MVVM); `UI/` — `WBP_HealthBar` (shared player/NPC chip bar), `WBP_MASessionRowWidget`. The match overlay / scoreboard / kill feed have **no widget assets** — they are C++-built (`WidgetTree::ConstructWidget`)
+- `Blueprints/UI/` — `WBP_HUD` (chip health bar + 5-slot skill bar), `WBP_SkillSlot`, `WBP_MainMenu` (MVVM); `UI/` — `WBP_HealthBar` (shared player/NPC chip bar), `WBP_MASessionRowWidget`. The match overlay / scoreboard / kill feed and the lock-on reticle (`MALockOnReticleWidget`) have **no widget assets** — they are C++-built (`WidgetTree::ConstructWidget`)
 
 > The bulk of the content above was authored **agent-side via UnrealAgentMCP** (private repo): montage creation/cropping, AnimNotify placement, GE configuration, BehaviorTree nodes, UMG widget trees + MVVM bindings, AnimGraph surgery (cached-pose/slot/layered-blend/ModifyBone chains) and the arena dressing all happened through MCP tools — several of which were built (with save/reload regression tests) precisely because this project needed them. That dogfooding loop is the second half of the portfolio.
 
@@ -255,7 +292,17 @@ Or via UBT externally:
   -Project="<absolute-path>/MultiPlayerAction.uproject" -WaitMutex
 ```
 
-PIE: open `Content/Maps/ThirdPersonMap`, set Number of Players ≥ 2 to exercise multiplayer replication (or start from `Maps/MainMenu` and Host/Join through the session front-end). **LMB** 3-hit sword combo (mash to chain, press in the window to cancel recovery), **RMB hold** block (70% mitigation, guard stance), **Q** fireball (mobile upper-body cast, projectile flies at the camera-ray aim point), **Shift** sprint, **Ctrl** dodge i-frame, **Tab** scoreboard — all five abilities on the HUD skill bar. The match is a **5-minute / first-to-10 deathmatch**: kills feed the top-right ticker and the K/D line under the clock, dying shows the killer + a respawn countdown, and the match ends into a pinned results screen that auto-restarts the map 10 s later. Walk near the `BP_TargetDummy` placed in the map — it chases (NavMesh, reachability-aware targeting) and attacks via BT with the same melee GA; staggers interrupt your combo, blocking absorbs them, and dummy kills count toward the match (solo-friendly loop). Console `DamageSelf 100` self-damages (Server RPC) to test the authored death → ragdoll → respawn chain. Acceptance was also run at 100ms emulated latency (PIE Network Emulation).
+PIE: open `Content/Maps/ThirdPersonMap`, set Number of Players ≥ 2 to exercise multiplayer replication (or start from `Maps/MainMenu` and Host/Join through the session front-end). **LMB** 4-hit katana combo (mash to chain, press in the window to cancel recovery; each swing motion-warps onto the locked/cone target), **RMB hold** block (70% mitigation, katana guard), **E** dash-slash (motion-warped lunge), **Q** fireball (mobile upper-body cast, projectile flies at the camera-ray aim point), **Shift** sprint, **Ctrl** dodge i-frame, **R3 / Middle-Mouse** lock-on (right-stick flick to switch target), **Tab** scoreboard — all on the HUD skill bar. The match is a **5-minute / first-to-10 deathmatch**: kills feed the top-right ticker and the K/D line under the clock, dying shows the killer + a respawn countdown, and the match ends into a pinned results screen that auto-restarts the map 10 s later. Walk near the `BP_TargetDummy` placed in the map — it chases (NavMesh, reachability-aware targeting) and attacks via BT with the same melee GA; staggers interrupt your combo, blocking absorbs them, and dummy kills count toward the match (solo-friendly loop). Console `DamageSelf 100` self-damages (Server RPC) to test the authored death → ragdoll → respawn chain. Acceptance was also run at 100ms emulated latency (PIE Network Emulation).
+
+### Tests
+
+The pure gameplay cores — lag-comp geometry, reconciliation stats, lunge target pick, hit-feel curve, AI token ledger / defense policy — ship with a UE Automation suite under `Source/MultiPlayerAction/Tests/` (engine-independent logic, runs headless). Run from the editor's **Session Frontend → Automation**, or:
+```
+"<UE_5.5>/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" \
+  "<absolute-path>/MultiPlayerAction.uproject" \
+  -ExecCmds="Automation RunTests MultiPlayerAction; Quit" -unattended -nullrhi -nop4 -log
+```
+Suites: `MultiPlayerAction.{LagComp,AICombat,Lunge,Prediction,HitFeel}.*` (~10 tests).
 
 ---
 
@@ -263,7 +310,7 @@ PIE: open `Content/Maps/ThirdPersonMap`, set Number of Players ≥ 2 to exercise
 
 - Code leans toward **C++ first, Blueprint composition only** — engine-level work, not BP scripting.
 - Architecture decisions follow Lyra conventions where applicable (HUD widget binding, NPC ASC ownership, `Damage` meta-attribute routing, `BehaviorTree` + GAS integration, replication modes).
-- Multiplayer correctness validated in PIE listen-server with 2 players: server-authoritative damage, attribute replication, ragdoll Multicast, owning-client HUD binding.
+- Multiplayer correctness validated in PIE listen-server with 2 players: server-authoritative damage, attribute replication, ragdoll Multicast, owning-client HUD binding. Pure netcode/combat cores (lag-comp geometry, reconciliation stats, lunge pick, AI token ledger / defense policy) are additionally covered by a headless UE Automation suite.
 - Dev gotchas captured in commit messages — UE 5.5 deprecations (`SetAssetTags`, `SetNetUpdateFrequency`, GE Components system), the `RestartPlayer` teleport-existing trap, `NetMulticast` for component state, `bWarningsAsErrors` shadow-name pitfalls.
 
 ---
