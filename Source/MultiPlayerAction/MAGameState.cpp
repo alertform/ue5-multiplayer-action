@@ -19,6 +19,11 @@ void AMAGameState::Multicast_OnKill_Implementation(const FString& KillerName, co
 	OnKillEvent.Broadcast(KillerName, VictimName);
 }
 
+void AMAGameState::Multicast_OnTaunt_Implementation(const FString& Text)
+{
+	OnTauntEvent.Broadcast(Text);
+}
+
 void AMAGameState::HandleMatchHasEnded()
 {
 	Super::HandleMatchHasEnded();

@@ -30,11 +30,14 @@ private:
 	void ConsumeLine(const uint8* LineStart, int32 LineLen, TArray<FString>& OutEvents);
 };
 
-/** delta.content 为一个流式 chunk 解出的增量文本；FinishReason 非空表示生成结束。 */
+/** delta.content 为一个流式 chunk 解出的增量文本；FinishReason 非空表示生成结束。
+ *  末尾 chunk 可能携带 usage 统计（-1 = 本 chunk 未携带）。 */
 struct FMAOpenAIChunk
 {
 	FString Content;
 	FString FinishReason;
+	int32 PromptTokens = -1;
+	int32 CompletionTokens = -1;
 	bool bValid = false;
 };
 

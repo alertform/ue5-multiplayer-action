@@ -110,6 +110,21 @@ FMAOpenAIChunk ParseChunk(const FString& Payload)
 	}
 	(*Choice)->TryGetStringField(TEXT("finish_reason"), Out.FinishReason);
 
+	// 部分端点在末尾 chunk 附带 usage —— 有则捕获，供成本日志用。
+	const TSharedPtr<FJsonObject>* Usage = nullptr;
+	if (Root->TryGetObjectField(TEXT("usage"), Usage))
+	{
+		double Prompt = 0.0, Completion = 0.0;
+		if ((*Usage)->TryGetNumberField(TEXT("prompt_tokens"), Prompt))
+		{
+			Out.PromptTokens = static_cast<int32>(Prompt);
+		}
+		if ((*Usage)->TryGetNumberField(TEXT("completion_tokens"), Completion))
+		{
+			Out.CompletionTokens = static_cast<int32>(Completion);
+		}
+	}
+
 	return Out;
 }
 

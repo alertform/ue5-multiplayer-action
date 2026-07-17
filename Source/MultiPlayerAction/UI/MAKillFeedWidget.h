@@ -37,4 +37,8 @@ private:
 	bool bBoundToGameState = false;
 
 	void HandleKill(const FString& KillerName, const FString& VictimName);
+	void HandleTaunt(const FString& Text);
+
+	/** 共用的加行逻辑（封顶+过期由 Tick 统一管理）。 */
+	void AddLine(const FString& LineString, const FLinearColor& Color);
 };

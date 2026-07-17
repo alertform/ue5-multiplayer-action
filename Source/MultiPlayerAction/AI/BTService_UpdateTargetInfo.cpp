@@ -1,5 +1,6 @@
 #include "AI/BTService_UpdateTargetInfo.h"
 #include "AIController.h"
+#include "AI/Combat/MATacticalAdvisorSubsystem.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Dialogue/MADialogueSubsystem.h"
@@ -89,6 +90,27 @@ void UBTService_UpdateTargetInfo::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 			BestDistSq = DistSq;
 			PlayerPawn = Candidate;
 			bBestReachable = bReachable;
+		}
+	}
+
+	// LLM 军师指定了集火目标时优先采纳 —— 但必须通过与普通候选相同的硬校验
+	// （存活、非对话中；死亡/失效由 GetFocusPawn 的弱指针与上面的循环兜底）。
+	if (const UMATacticalAdvisorSubsystem* Advisor = MyPawn->GetWorld()->GetSubsystem<UMATacticalAdvisorSubsystem>())
+	{
+		if (APawn* Focus = Advisor->GetFocusPawn())
+		{
+			bool bFocusDead = false;
+			if (const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Focus))
+			{
+				bFocusDead = ASC->HasMatchingGameplayTag(MAGameplayTags::State_Dead);
+			}
+			const bool bFocusInDialogue = Dialogue &&
+				Dialogue->IsInDialogue(Cast<AMAPlayerController>(Focus->GetController()));
+			if (!bFocusDead && !bFocusInDialogue)
+			{
+				PlayerPawn = Focus;
+				BestDistSq = FVector::DistSquared(MyLocation, Focus->GetActorLocation());
+			}
 		}
 	}
 

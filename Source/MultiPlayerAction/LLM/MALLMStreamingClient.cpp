@@ -15,13 +15,16 @@ namespace
 	// 错误体只留头部这么多字节用于诊断，防止异常大响应吃内存。
 	constexpr int32 GMaxRawHeadBytes = 8 * 1024;
 
-	FString BuildRequestBody(const TArray<FMALLMMessage>& Messages, const UMALLMSettings& S)
+	FString BuildRequestBody(const TArray<FMALLMMessage>& Messages, const UMALLMSettings& S,
+		const FMALLMStreamRequest::FOverrides& Overrides)
 	{
 		TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
-		Root->SetStringField(TEXT("model"), S.Model);
+		Root->SetStringField(TEXT("model"), Overrides.Model.IsEmpty() ? S.Model : Overrides.Model);
 		Root->SetBoolField(TEXT("stream"), true);
-		Root->SetNumberField(TEXT("temperature"), S.Temperature);
-		Root->SetNumberField(TEXT("max_tokens"), S.MaxTokens);
+		Root->SetNumberField(TEXT("temperature"),
+			Overrides.Temperature >= 0.f ? Overrides.Temperature : S.Temperature);
+		Root->SetNumberField(TEXT("max_tokens"),
+			Overrides.MaxTokens > 0 ? Overrides.MaxTokens : S.MaxTokens);
 
 		TArray<TSharedPtr<FJsonValue>> MessageArray;
 		MessageArray.Reserve(Messages.Num());
@@ -42,7 +45,8 @@ namespace
 }
 
 TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> FMALLMStreamRequest::Start(
-	const TArray<FMALLMMessage>& Messages, FCallbacks InCallbacks, FString& OutError)
+	const TArray<FMALLMMessage>& Messages, FCallbacks InCallbacks, FString& OutError,
+	const FOverrides& Overrides)
 {
 	check(IsInGameThread());
 
@@ -78,7 +82,7 @@ TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> FMALLMStreamRequest::Start(
 	Request->SetHeader(TEXT("Accept"), TEXT("text/event-stream"));
 	Request->SetTimeout(S->TotalTimeoutSeconds);
 	Request->SetActivityTimeout(S->ActivityTimeoutSeconds);
-	Request->SetContentAsString(BuildRequestBody(Messages, *S));
+	Request->SetContentAsString(BuildRequestBody(Messages, *S, Overrides));
 
 	TWeakPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> WeakSelf = Self;
 
@@ -158,6 +162,16 @@ void FMALLMStreamRequest::ProcessBytes(TArray<uint8> Bytes)
 		{
 			bFinished = true;
 			bActive = false;
+			if (UsagePromptTokens >= 0)
+			{
+				UE_LOG(LogMALLM, Log, TEXT("token 用量：prompt=%d completion=%d finish=%s"),
+					UsagePromptTokens, UsageCompletionTokens, *LastFinishReason);
+			}
+			if (Accumulated.IsEmpty())
+			{
+				UE_LOG(LogMALLM, Warning, TEXT("流结束但正文为空：finish=%s（length=输出预算被耗尽，思考型模型需更大 max_tokens）"),
+					*LastFinishReason);
+			}
 			if (Callbacks.OnComplete)
 			{
 				Callbacks.OnComplete(Accumulated);
@@ -170,6 +184,15 @@ void FMALLMStreamRequest::ProcessBytes(TArray<uint8> Bytes)
 		{
 			UE_LOG(LogMALLM, Verbose, TEXT("忽略无法解析的流式载荷：%s"), *Event.Left(200));
 			continue;
+		}
+		if (Chunk.PromptTokens >= 0)
+		{
+			UsagePromptTokens = Chunk.PromptTokens;
+			UsageCompletionTokens = Chunk.CompletionTokens;
+		}
+		if (!Chunk.FinishReason.IsEmpty())
+		{
+			LastFinishReason = Chunk.FinishReason;
 		}
 		if (!Chunk.Content.IsEmpty())
 		{

@@ -14,6 +14,7 @@
 static const FLinearColor GKillFeedText(0.92f, 0.92f, 0.92f, 1.f);
 static const FLinearColor GKillFeedAccent(1.0f, 0.78f, 0.35f, 1.f);
 static const FLinearColor GKillFeedShadow(0.f, 0.f, 0.f, 0.8f);
+static const FLinearColor GKillFeedTaunt(0.95f, 0.38f, 0.32f, 1.f);   // 敌方喊话 — 猩红
 
 static const float GKillFeedLineSeconds = 6.f;
 static const int32 GKillFeedMaxLines = 5;
@@ -40,6 +41,7 @@ void UMAKillFeedWidget::NativeDestruct()
 	if (AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr)
 	{
 		GS->OnKillEvent.RemoveAll(this);
+		GS->OnTauntEvent.RemoveAll(this);
 	}
 	Super::NativeDestruct();
 }
@@ -54,6 +56,7 @@ void UMAKillFeedWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
 		if (AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr)
 		{
 			GS->OnKillEvent.AddUObject(this, &UMAKillFeedWidget::HandleKill);
+			GS->OnTauntEvent.AddUObject(this, &UMAKillFeedWidget::HandleTaunt);
 			bBoundToGameState = true;
 		}
 		return;
@@ -70,18 +73,6 @@ void UMAKillFeedWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
 
 void UMAKillFeedWidget::HandleKill(const FString& KillerName, const FString& VictimName)
 {
-	if (!FeedBox)
-	{
-		return;
-	}
-
-	// Cap the feed — drop the oldest line to make room.
-	while (Lines.Num() >= GKillFeedMaxLines)
-	{
-		FeedBox->RemoveChild(Lines[0].Text);
-		Lines.RemoveAt(0);
-	}
-
 	const FString LineString = KillerName.IsEmpty()
 		? FString::Printf(TEXT("%s died"), *VictimName)
 		: FString::Printf(TEXT("%s  >  %s"), *KillerName, *VictimName);
@@ -98,9 +89,31 @@ void UMAKillFeedWidget::HandleKill(const FString& KillerName, const FString& Vic
 	const bool bInvolvesLocal = !LocalName.IsEmpty()
 		&& (KillerName == LocalName || VictimName == LocalName);
 
+	AddLine(LineString, bInvolvesLocal ? GKillFeedAccent : GKillFeedText);
+}
+
+void UMAKillFeedWidget::HandleTaunt(const FString& Text)
+{
+	AddLine(FString::Printf(TEXT("「敌军」%s"), *Text), GKillFeedTaunt);
+}
+
+void UMAKillFeedWidget::AddLine(const FString& LineString, const FLinearColor& Color)
+{
+	if (!FeedBox)
+	{
+		return;
+	}
+
+	// Cap the feed — drop the oldest line to make room.
+	while (Lines.Num() >= GKillFeedMaxLines)
+	{
+		FeedBox->RemoveChild(Lines[0].Text);
+		Lines.RemoveAt(0);
+	}
+
 	UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	Text->SetFont(FSlateFontInfo(FCoreStyle::GetDefaultFontStyle("Bold", 14)));
-	Text->SetColorAndOpacity(FSlateColor(bInvolvesLocal ? GKillFeedAccent : GKillFeedText));
+	Text->SetColorAndOpacity(FSlateColor(Color));
 	Text->SetShadowOffset(FVector2D(1.f, 1.f));
 	Text->SetShadowColorAndOpacity(GKillFeedShadow);
 	Text->SetJustification(ETextJustify::Right);

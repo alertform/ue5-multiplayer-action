@@ -27,12 +27,21 @@ public:
 		TFunction<void(const FString&)> OnError;
 	};
 
+	/** 按调用覆盖 UMALLMSettings 的采样参数（<0/空 = 用配置值）。军师类小输出场景用。 */
+	struct FOverrides
+	{
+		int32 MaxTokens = -1;
+		float Temperature = -1.f;
+		FString Model;
+	};
+
 	/**
 	 * 发起流式请求。配置无效（缺 API key 等）时返回 nullptr 并填 OutError，
 	 * 此时不会有任何回调。只能在游戏线程调用。
 	 */
 	static TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> Start(
-		const TArray<FMALLMMessage>& Messages, FCallbacks InCallbacks, FString& OutError);
+		const TArray<FMALLMMessage>& Messages, FCallbacks InCallbacks, FString& OutError,
+		const FOverrides& Overrides = FOverrides());
 
 	/** 取消：立刻停止回调（包括正在飞行的数据），随后中止 HTTP 请求。 */
 	void Cancel();
@@ -52,6 +61,13 @@ private:
 
 	/** 已流出的全文（OnComplete 的参数）。 */
 	FString Accumulated;
+
+	/** 末尾 chunk 捕获的 usage（-1 = 服务端未提供），完成时打进成本日志。 */
+	int32 UsagePromptTokens = -1;
+	int32 UsageCompletionTokens = -1;
+
+	/** 最后见到的 finish_reason（诊断：length = 输出被 max_tokens 截断）。 */
+	FString LastFinishReason;
 
 	/** 响应体开头的原始字节（错误体诊断用；SSE 流不会走到解析它那步）。 */
 	TArray<uint8> RawHead;

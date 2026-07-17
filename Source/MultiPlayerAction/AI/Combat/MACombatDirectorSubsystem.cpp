@@ -19,6 +19,17 @@ static TAutoConsoleVariable<int32> CVarAIDebug(
 	TEXT("ma.AI.Debug"), 0,
 	TEXT("1 = draw ATK over attack-token holders and BLK over blocking AIs."));
 
+int32 UMACombatDirectorSubsystem::EffectiveCapacity() const
+{
+	const int32 CVarValue = CVarMaxAttackers.GetValueOnGameThread();
+	// 手动压制（和平模式）绝对优先；军师只在正常战斗里调节强度。
+	if (CVarValue <= 0)
+	{
+		return CVarValue;
+	}
+	return AdvisorMaxAttackers >= 0 ? FMath::Clamp(AdvisorMaxAttackers, 0, 3) : CVarValue;
+}
+
 bool UMACombatDirectorSubsystem::ClaimToken(AActor* Holder)
 {
 	UWorld* W = GetWorld();
@@ -26,7 +37,7 @@ bool UMACombatDirectorSubsystem::ClaimToken(AActor* Holder)
 	{
 		return false;
 	}
-	Ledger.SetCapacity(CVarMaxAttackers.GetValueOnGameThread());
+	Ledger.SetCapacity(EffectiveCapacity());
 	const uint32 Id = Holder->GetUniqueID();
 	const bool bGranted = Ledger.Request(Id, W->GetTimeSeconds());
 	if (bGranted)
@@ -60,7 +71,7 @@ void UMACombatDirectorSubsystem::Tick(float DeltaTime)
 	}
 
 	const float Now = W->GetTimeSeconds();
-	Ledger.SetCapacity(CVarMaxAttackers.GetValueOnGameThread());
+	Ledger.SetCapacity(EffectiveCapacity());
 	Ledger.ReapExpired(Now, CVarTokenTTL.GetValueOnGameThread());
 
 	const bool bDebug = CVarAIDebug.GetValueOnGameThread() != 0;
