@@ -32,6 +32,9 @@ public:
 	/** server：玩家关闭对话窗 → 取消飞行中请求并丢弃会话。 */
 	void EndSession(AMAPlayerController* PC);
 
+	/** server：该玩家是否有进行中的对话会话（AI 目标选择用它豁免对话中的玩家）。 */
+	bool IsInDialogue(const AMAPlayerController* PC) const;
+
 	// UTickableWorldSubsystem
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;

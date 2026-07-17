@@ -2,8 +2,10 @@
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Dialogue/MADialogueSubsystem.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/MAPlayerController.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -41,6 +43,9 @@ void UBTService_UpdateTargetInfo::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(MyPawn->GetWorld());
 	const FVector MyLocation = MyPawn->GetActorLocation();
 
+	// 对话中的玩家享有豁免：AI 不选其为目标（对话 = 安全时刻）。
+	const UMADialogueSubsystem* Dialogue = MyPawn->GetWorld()->GetSubsystem<UMADialogueSubsystem>();
+
 	APawn* PlayerPawn = nullptr;
 	float BestDistSq = TNumericLimits<float>::Max();
 	bool bBestReachable = false;
@@ -49,6 +54,11 @@ void UBTService_UpdateTargetInfo::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 		const APlayerController* PC = It->Get();
 		APawn* Candidate = PC ? PC->GetPawn() : nullptr;
 		if (!Candidate)
+		{
+			continue;
+		}
+
+		if (Dialogue && Dialogue->IsInDialogue(Cast<AMAPlayerController>(PC)))
 		{
 			continue;
 		}

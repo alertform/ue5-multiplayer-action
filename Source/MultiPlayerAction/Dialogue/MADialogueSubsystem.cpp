@@ -161,6 +161,11 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 	}
 }
 
+bool UMADialogueSubsystem::IsInDialogue(const AMAPlayerController* PC) const
+{
+	return PC && Sessions.Contains(TWeakObjectPtr<AMAPlayerController>(const_cast<AMAPlayerController*>(PC)));
+}
+
 void UMADialogueSubsystem::EndSession(AMAPlayerController* PC)
 {
 	if (const TWeakObjectPtr<AMAPlayerController> Key(PC); Sessions.Contains(Key))
