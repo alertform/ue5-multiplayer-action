@@ -1,10 +1,12 @@
 #include "AbilitySystem/Cues/GCN_ParticleBurst.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Particles/ParticleSystem.h"
 
 bool UGCN_ParticleBurst::OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const
 {
-	if (!ParticleTemplate)
+	if (!ParticleTemplate && !NiagaraTemplate)
 	{
 		return false;
 	}
@@ -22,6 +24,13 @@ bool UGCN_ParticleBurst::OnExecute_Implementation(AActor* MyTarget, const FGamep
 	}
 
 	const FRotator Rotation = Parameters.Normal.IsNearlyZero() ? FRotator::ZeroRotator : Parameters.Normal.Rotation();
-	UGameplayStatics::SpawnEmitterAtLocation(World, ParticleTemplate, Parameters.Location, Rotation);
+	if (ParticleTemplate)
+	{
+		UGameplayStatics::SpawnEmitterAtLocation(World, ParticleTemplate, Parameters.Location, Rotation);
+	}
+	if (NiagaraTemplate)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, NiagaraTemplate, Parameters.Location, Rotation);
+	}
 	return true;
 }

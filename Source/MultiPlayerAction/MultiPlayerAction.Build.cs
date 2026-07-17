@@ -26,7 +26,9 @@ public class MultiPlayerAction : ModuleRules
 			// Camera shakes (UDefaultCameraShakeBase + Perlin pattern live in this plugin, enabled by default)
 			"EngineCameras",
 			// Root-motion warping for the dash slash
-			"MotionWarping"
+			"MotionWarping",
+			// Niagara burst template on GCN_ParticleBurst (blood splatter on melee hits)
+			"Niagara"
 		});
 	}
 }
