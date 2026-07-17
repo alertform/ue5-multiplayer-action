@@ -45,11 +45,11 @@ protected:
 
 	/** Seconds the chip holds after the LAST hit before draining (each hit resets the timer) */
 	UPROPERTY(EditAnywhere, Category = "Chip", meta = (ClampMin = "0.0", UIMax = "10.0"))
-	float ChipHoldSeconds = 3.0f;
+	float ChipHoldSeconds = 0.8f;
 
 	/** Chip drain rate in bar-fraction per second once the hold expires */
 	UPROPERTY(EditAnywhere, Category = "Chip", meta = (ClampMin = "0.01", UIMax = "5.0"))
-	float ChipDrainPerSecond = 0.6f;
+	float ChipDrainPerSecond = 2.0f;
 
 	/** Overhead-bar death: the chip skips the hold and drains at this rate; at zero the bar
 	 *  collapses instantly. Only applies in bHideUntilDamaged mode (enemy overhead bars). */
