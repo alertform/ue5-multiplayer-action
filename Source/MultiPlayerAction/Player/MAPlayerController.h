@@ -8,6 +8,8 @@ class UMAUserWidget;
 class UMAMatchStatusWidget;
 class UMAScoreboardWidget;
 class UMAKillFeedWidget;
+class UMADialogueWidget;
+class UMADialogueComponent;
 
 /**
  * Owns local-player UI. Spawns the HUD widget on BeginPlay and binds it to the
@@ -26,6 +28,7 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void OnRep_PlayerState() override;
+	virtual void SetupInputComponent() override;
 
 	/** Dev cheat: apply damage to own Health (bypasses GE pipeline) — 控制台输 DamageSelf 10 */
 	UFUNCTION(Exec)
@@ -48,6 +51,33 @@ public:
 	/** Server -> owning client: HUD respawn countdown (server world time when respawn fires). */
 	UFUNCTION(Client, Reliable)
 	void Client_OnRespawnScheduled(float RespawnEndServerTime);
+
+	// ===== NPC LLM 流式对话（server 代理 Kimi，见 UMADialogueSubsystem）=====
+
+	/** widget → PC：玩家回车提交一条消息（本地上屏 + 发给 server）。 */
+	void SubmitDialogueText(const FString& Text);
+
+	/** widget ✕ / Esc → PC：关窗、还原输入模式、通知 server 销毁会话。 */
+	void CloseDialogue();
+
+	UFUNCTION(Server, Reliable)
+	void Server_StartDialogue(AActor* NpcActor);
+
+	UFUNCTION(Server, Reliable)
+	void Server_SendDialogueMessage(const FString& Text);
+
+	UFUNCTION(Server, Reliable)
+	void Server_EndDialogue();
+
+	/** server → owning client：合批后的流式增量。MessageId 用于丢弃打断后迟到的增量。 */
+	UFUNCTION(Client, Reliable)
+	void Client_DialogueDelta(int32 MessageId, const FString& Text);
+
+	UFUNCTION(Client, Reliable)
+	void Client_DialogueCompleted(int32 MessageId);
+
+	UFUNCTION(Client, Reliable)
+	void Client_DialogueError(const FString& Message);
 
 protected:
 	void Respawn();
@@ -85,4 +115,19 @@ protected:
 private:
 	/** Idempotent: creates widget if not yet created, then binds to ASC if PS available. */
 	void EnsureHUDInitialized();
+
+	// ===== NPC LLM 对话（客户端侧状态）=====
+
+	/** T 键：搜寻交互半径内最近的对话 NPC，找到即开窗。 */
+	void OnInteractPressed();
+
+	UMADialogueComponent* FindNearbyDialogueNpc() const;
+
+	UPROPERTY()
+	TObjectPtr<UMADialogueWidget> DialogueWidget;
+
+	/** 当前正在流式上屏的服务器消息号（INDEX_NONE = 无）。 */
+	int32 ClientDialogueMessageId = INDEX_NONE;
+
+	bool bDialogueOpen = false;
 };

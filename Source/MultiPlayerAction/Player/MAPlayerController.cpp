@@ -4,6 +4,9 @@
 #include "UI/MAMatchStatusWidget.h"
 #include "UI/MAScoreboardWidget.h"
 #include "UI/MAKillFeedWidget.h"
+#include "UI/MADialogueWidget.h"
+#include "Dialogue/MADialogueComponent.h"
+#include "Dialogue/MADialogueSubsystem.h"
 #include "AbilitySystem/MAAttributeSet.h"
 #include "AbilitySystem/MAGameplayTags.h"
 #include "AbilitySystemComponent.h"
@@ -14,6 +17,8 @@
 #include "TimerManager.h"
 #include "Engine/World.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UObject/UObjectIterator.h"
+#include "GameFramework/Pawn.h"
 
 AMAPlayerController::AMAPlayerController()
 {
@@ -53,6 +58,177 @@ void AMAPlayerController::OnRep_PlayerState()
 	Super::OnRep_PlayerState();
 	// Client path: PS just replicated — retry HUD init in case BeginPlay ran first
 	EnsureHUDInitialized();
+}
+
+void AMAPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	// 对话交互键走 PC 层 legacy BindKey（与角色的 Enhanced Input 并存）——
+	// UI 域按键不动 IMC 资产；对话窗打开后输入模式切 UIOnly，此绑定天然失效。
+	InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AMAPlayerController::OnInteractPressed);
+}
+
+// ===== NPC LLM 流式对话 =====
+
+void AMAPlayerController::OnInteractPressed()
+{
+	if (bDialogueOpen)
+	{
+		return;
+	}
+
+	UMADialogueComponent* Npc = FindNearbyDialogueNpc();
+	if (!Npc)
+	{
+		return;
+	}
+
+	if (!DialogueWidget)
+	{
+		DialogueWidget = CreateWidget<UMADialogueWidget>(this, UMADialogueWidget::StaticClass());
+		if (!DialogueWidget)
+		{
+			return;
+		}
+		DialogueWidget->AddToViewport(20);
+	}
+
+	// 本地立即开窗、上开场白 —— 不等 server 往返。
+	DialogueWidget->SetVisibility(ESlateVisibility::Visible);
+	DialogueWidget->OpenFor(Npc->NpcName, Npc->Greeting);
+	bDialogueOpen = true;
+	ClientDialogueMessageId = INDEX_NONE;
+
+	FInputModeUIOnly InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	SetShowMouseCursor(true);
+	DialogueWidget->FocusInput();
+
+	Server_StartDialogue(Npc->GetOwner());
+}
+
+UMADialogueComponent* AMAPlayerController::FindNearbyDialogueNpc() const
+{
+	const APawn* MyPawn = GetPawn();
+	if (!MyPawn)
+	{
+		return nullptr;
+	}
+
+	// 演示规模下全量遍历即可（世界里就几个 NPC）；GetWorld 比对天然滤掉 CDO/别的世界。
+	UMADialogueComponent* Best = nullptr;
+	float BestDistSq = TNumericLimits<float>::Max();
+	for (UMADialogueComponent* Comp : TObjectRange<UMADialogueComponent>())
+	{
+		if (!IsValid(Comp) || Comp->GetWorld() != GetWorld() || !Comp->GetOwner())
+		{
+			continue;
+		}
+		const float DistSq = FVector::DistSquared(
+			MyPawn->GetActorLocation(), Comp->GetOwner()->GetActorLocation());
+		if (DistSq <= FMath::Square(Comp->InteractRadius) && DistSq < BestDistSq)
+		{
+			Best = Comp;
+			BestDistSq = DistSq;
+		}
+	}
+	return Best;
+}
+
+void AMAPlayerController::SubmitDialogueText(const FString& Text)
+{
+	if (!bDialogueOpen || !DialogueWidget)
+	{
+		return;
+	}
+	DialogueWidget->AppendPlayerLine(Text);
+	DialogueWidget->SetWaitingStatus();
+	Server_SendDialogueMessage(Text);
+}
+
+void AMAPlayerController::CloseDialogue()
+{
+	if (!bDialogueOpen)
+	{
+		return;
+	}
+	bDialogueOpen = false;
+	ClientDialogueMessageId = INDEX_NONE;
+
+	if (DialogueWidget)
+	{
+		DialogueWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+	SetShowMouseCursor(false);
+
+	Server_EndDialogue();
+}
+
+void AMAPlayerController::Server_StartDialogue_Implementation(AActor* NpcActor)
+{
+	if (!NpcActor)
+	{
+		return;
+	}
+	if (UMADialogueSubsystem* Dialogue = GetWorld()->GetSubsystem<UMADialogueSubsystem>())
+	{
+		Dialogue->StartSession(this, NpcActor->FindComponentByClass<UMADialogueComponent>());
+	}
+}
+
+void AMAPlayerController::Server_SendDialogueMessage_Implementation(const FString& Text)
+{
+	if (UMADialogueSubsystem* Dialogue = GetWorld()->GetSubsystem<UMADialogueSubsystem>())
+	{
+		Dialogue->SendPlayerMessage(this, Text);
+	}
+}
+
+void AMAPlayerController::Server_EndDialogue_Implementation()
+{
+	if (UMADialogueSubsystem* Dialogue = GetWorld()->GetSubsystem<UMADialogueSubsystem>())
+	{
+		Dialogue->EndSession(this);
+	}
+}
+
+void AMAPlayerController::Client_DialogueDelta_Implementation(int32 MessageId, const FString& Text)
+{
+	if (!bDialogueOpen || !DialogueWidget)
+	{
+		return;
+	}
+	if (MessageId != ClientDialogueMessageId)
+	{
+		// 新回复开始（或上一条被打断）——封旧行，起新行。
+		DialogueWidget->FinishNpcLine();
+		ClientDialogueMessageId = MessageId;
+	}
+	DialogueWidget->AppendNpcDelta(Text);
+}
+
+void AMAPlayerController::Client_DialogueCompleted_Implementation(int32 MessageId)
+{
+	if (!bDialogueOpen || !DialogueWidget || MessageId != ClientDialogueMessageId)
+	{
+		return;
+	}
+	DialogueWidget->FinishNpcLine();
+	ClientDialogueMessageId = INDEX_NONE;
+}
+
+void AMAPlayerController::Client_DialogueError_Implementation(const FString& Message)
+{
+	if (!bDialogueOpen || !DialogueWidget)
+	{
+		return;
+	}
+	DialogueWidget->ShowError(Message);
 }
 
 void AMAPlayerController::ScheduleRespawn(float Delay)
