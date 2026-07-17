@@ -97,17 +97,31 @@ bool UMALockOnComponent::HandleLookInput(const FVector2D& AxisValue)
 	}
 
 	const float X = AxisValue.X;
+	const float AbsX = FMath::Abs(X);
 	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 
-	if (bSwitchArmed && FMath::Abs(X) >= SwitchInputThreshold && (Now - LastSwitchTime) > SwitchCooldown)
+	if (AbsX <= SwitchReleaseThreshold)
 	{
-		SwitchTarget(X > 0.f ? 1.f : -1.f);
-		bSwitchArmed = false;
-		LastSwitchTime = Now;
+		// 归中区：鼠标增量帧间抖动会频繁掠过这里，所以重新武装要求
+		// 连续驻留 SwitchRearmDwell —— 单帧的抖动不再武装切换。
+		if (NeutralSince < 0.f)
+		{
+			NeutralSince = Now;
+		}
+		if (!bSwitchArmed && (Now - NeutralSince) >= SwitchRearmDwell)
+		{
+			bSwitchArmed = true;
+		}
 	}
-	else if (FMath::Abs(X) <= SwitchReleaseThreshold)
+	else
 	{
-		bSwitchArmed = true; // stick re-centered — ready for the next flick
+		NeutralSince = -1.f;
+		if (bSwitchArmed && AbsX >= SwitchInputThreshold && (Now - LastSwitchTime) > SwitchCooldown)
+		{
+			SwitchTarget(X > 0.f ? 1.f : -1.f);
+			bSwitchArmed = false;
+			LastSwitchTime = Now;
+		}
 	}
 
 	return true; // consumed: camera stays glued to the target
@@ -159,6 +173,7 @@ void UMALockOnComponent::AdoptTarget(AActor* NewTarget)
 {
 	CurrentTarget = NewTarget;
 	bSwitchArmed = false; // require a re-center before the next switch
+	NeutralSince = -1.f;  // 驻留计时随之作废 —— 新目标从零开始积累归中时间
 	EnsureReticle();
 	if (Reticle)
 	{

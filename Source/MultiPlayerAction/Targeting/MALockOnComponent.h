@@ -83,7 +83,12 @@ private:
 	float SwitchReleaseThreshold = 0.25f;
 
 	UPROPERTY(EditAnywhere, Category = "LockOn")
-	float SwitchCooldown = 0.3f;
+	float SwitchCooldown = 0.5f;
+
+	/** 输入须连续低于 SwitchReleaseThreshold 这么久才重新武装切换。鼠标 Look 是每帧
+	 *  增量，帧间随时跌回 0 —— 无驻留时间的话战斗中正常调视角就会连环误切目标。 */
+	UPROPERTY(EditAnywhere, Category = "LockOn")
+	float SwitchRearmDwell = 0.25f;
 
 	/** Vertical lift from actor origin toward the upper torso, for aim + reticle. */
 	UPROPERTY(EditAnywhere, Category = "LockOn")
@@ -101,6 +106,9 @@ private:
 
 	bool bSwitchArmed = true;
 	float LastSwitchTime = -100.f;
+
+	/** 输入进入归中区的时刻；-1 = 当前不在归中区。驱动 SwitchRearmDwell。 */
+	float NeutralSince = -1.f;
 
 	// Character orientation flags saved on lock, restored on release.
 	bool bSavedOrientToMovement = true;
