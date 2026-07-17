@@ -20,6 +20,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	FGameplayTag InputTag;
 
+	/** Lua 配置表里的技能键名（空 = 不走 Lua，纯用 UPROPERTY 默认） */
+	UPROPERTY(EditDefaultsOnly, Category = "Config")
+	FName ConfigKey;
+
 protected:
 	/** Get the avatar actor cast to our character class */
 	class AMultiPlayerActionCharacter* GetMACharacter(const FGameplayAbilityActorInfo* ActorInfo) const;
@@ -46,4 +50,9 @@ protected:
 
 	/** Restore MOVE_Walking, but only if still MOVE_None — death ragdoll etc. must not be stomped. */
 	void EndRootedAction(const FGameplayAbilityActorInfo* ActorInfo) const;
+
+	/** 从 Lua 配置读 float，缺配置/缺键 → Default。仅读 C++ 缓存，不碰 lua_State。 */
+	float ReadConfigFloat(FName Param, float Default) const;
+	/** 从 Lua 配置读 FName，缺配置/缺键 → Default。 */
+	FName ReadConfigName(FName Param, FName Default) const;
 };

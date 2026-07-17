@@ -12,6 +12,9 @@ UGA_Fireball::UGA_Fireball()
 {
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
+	// Lua 配置表键名（Content/Lua/AbilityConfig.lua），缺键回退本类 UPROPERTY 默认
+	ConfigKey = TEXT("Fireball");
+
 	// UE 5.5+ deprecates direct AbilityTags mutation — use SetAssetTags in constructor only (see GA_MeleeAttack).
 	FGameplayTagContainer Tags;
 	Tags.AddTag(MAGameplayTags::Ability_Ranged_Fireball);
@@ -61,7 +64,7 @@ void UGA_Fireball::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	// orient-to-movement, and SpawnProjectile aims with the camera ray independently.
 
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-		this, NAME_None, CastMontage, MontagePlayRate);
+		this, NAME_None, CastMontage, ReadConfigFloat(TEXT("MontagePlayRate"), MontagePlayRate));
 
 	// OnBlendOut + OnCompleted both fire on natural end — bind only OnCompleted to avoid double EndAbility
 	MontageTask->OnCompleted.AddDynamic(this, &UGA_Fireball::OnMontageEnded);
@@ -106,12 +109,13 @@ void UGA_Fireball::SpawnProjectile(const FGameplayAbilityActorInfo* ActorInfo)
 	APawn* AvatarPawn = Cast<APawn>(Avatar);
 
 	// Muzzle: hand socket when available, actor location + forward offset otherwise.
+	const FName MuzzleSocketEff = ReadConfigName(TEXT("MuzzleSocketName"), MuzzleSocketName);
 	FVector SpawnLocation = Avatar->GetActorLocation() + Avatar->GetActorForwardVector() * 50.f;
 	if (const ACharacter* AvatarCharacter = Cast<ACharacter>(Avatar))
 	{
-		if (AvatarCharacter->GetMesh() && AvatarCharacter->GetMesh()->DoesSocketExist(MuzzleSocketName))
+		if (AvatarCharacter->GetMesh() && AvatarCharacter->GetMesh()->DoesSocketExist(MuzzleSocketEff))
 		{
-			SpawnLocation = AvatarCharacter->GetMesh()->GetSocketLocation(MuzzleSocketName);
+			SpawnLocation = AvatarCharacter->GetMesh()->GetSocketLocation(MuzzleSocketEff);
 		}
 	}
 
@@ -152,7 +156,7 @@ void UGA_Fireball::SpawnProjectile(const FGameplayAbilityActorInfo* ActorInfo)
 		return;
 	}
 
-	Projectile->InitProjectile(DamageSpec, ExplosionRadius);
+	Projectile->InitProjectile(DamageSpec, ReadConfigFloat(TEXT("ExplosionRadius"), ExplosionRadius));
 	Projectile->FinishSpawning(SpawnTransform);
 }
 

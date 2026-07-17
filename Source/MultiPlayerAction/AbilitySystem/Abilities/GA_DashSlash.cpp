@@ -19,6 +19,9 @@ UGA_DashSlash::UGA_DashSlash()
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
+	// Lua 配置表键名（Content/Lua/AbilityConfig.lua），缺键回退本类 UPROPERTY 默认
+	ConfigKey = TEXT("DashSlash");
+
 	FGameplayTagContainer Tags;
 	Tags.AddTag(MAGameplayTags::Ability_Melee_DashSlash);
 	SetAssetTags(Tags);
@@ -65,10 +68,11 @@ void UGA_DashSlash::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 void UGA_DashSlash::SetupWarpTarget()
 {
 	FMALungeParams Params;
-	Params.ConeHalfAngleDeg = ConeHalfAngleDeg;
-	Params.MaxLungeDistanceCm = MaxLungeDistanceCm;
-	Params.StopDistanceCm = StopDistanceCm;
-	MAWarpOps::SetupWarpTargetForAbility(this, WarpTargetName, Params, NoTargetDashCm);
+	Params.ConeHalfAngleDeg = ReadConfigFloat(TEXT("ConeHalfAngleDeg"), ConeHalfAngleDeg);
+	Params.MaxLungeDistanceCm = ReadConfigFloat(TEXT("MaxLungeDistanceCm"), MaxLungeDistanceCm);
+	Params.StopDistanceCm = ReadConfigFloat(TEXT("StopDistanceCm"), StopDistanceCm);
+	MAWarpOps::SetupWarpTargetForAbility(this, WarpTargetName, Params,
+		ReadConfigFloat(TEXT("NoTargetDashCm"), NoTargetDashCm));
 }
 
 void UGA_DashSlash::ClearWarpTarget()
@@ -89,7 +93,9 @@ void UGA_DashSlash::OnHitEvent(FGameplayEventData EventData)
 		return;
 	}
 	const FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffect, GetAbilityLevel());
-	MAMeleeHitOps::SweepAndApplyMeleeHit(Avatar, SourceASC, SpecHandle, TraceDistance, TraceRadius);
+	MAMeleeHitOps::SweepAndApplyMeleeHit(Avatar, SourceASC, SpecHandle,
+		ReadConfigFloat(TEXT("TraceDistance"), TraceDistance),
+		ReadConfigFloat(TEXT("TraceRadius"), TraceRadius));
 }
 
 void UGA_DashSlash::OnMontageFinished()

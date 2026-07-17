@@ -1,5 +1,8 @@
 #include "AbilitySystem/Abilities/MAGameplayAbilityBase.h"
 #include "MultiPlayerActionCharacter.h"
+#include "Config/MALuaAbilityConfig.h"
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
@@ -94,4 +97,22 @@ void UMAGameplayAbilityBase::EndRootedAction(const FGameplayAbilityActorInfo* Ac
 			}
 		}
 	}
+}
+
+float UMAGameplayAbilityBase::ReadConfigFloat(FName Param, float Default) const
+{
+	if (ConfigKey.IsNone()) { return Default; }
+	const UWorld* World = GetWorld();
+	const UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
+	const UMALuaAbilityConfig* Cfg = GI ? GI->GetSubsystem<UMALuaAbilityConfig>() : nullptr;
+	return Cfg ? Cfg->GetFloat(ConfigKey, Param, Default) : Default;
+}
+
+FName UMAGameplayAbilityBase::ReadConfigName(FName Param, FName Default) const
+{
+	if (ConfigKey.IsNone()) { return Default; }
+	const UWorld* World = GetWorld();
+	const UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
+	const UMALuaAbilityConfig* Cfg = GI ? GI->GetSubsystem<UMALuaAbilityConfig>() : nullptr;
+	return Cfg ? Cfg->GetName(ConfigKey, Param, Default) : Default;
 }

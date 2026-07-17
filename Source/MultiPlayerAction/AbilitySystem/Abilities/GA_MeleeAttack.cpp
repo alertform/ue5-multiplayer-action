@@ -17,6 +17,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 {
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
+	// Lua 配置表键名（Content/Lua/AbilityConfig.lua），缺键回退本类 UPROPERTY 默认
+	ConfigKey = TEXT("MeleeAttack");
+
 	// Identify this ability by tag so TryActivateAbilitiesByTag can find it; BP children inherit this.
 	// UE 5.5+ deprecates direct AbilityTags mutation — use SetAssetTags in constructor only.
 	FGameplayTagContainer Tags;
@@ -70,9 +73,9 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	// before the montage so the section's AttackTarget warp window has its target on frame one.
 	SetupWarpTarget();
 
-	// Play montage at configurable rate (default 2.0x — see MontagePlayRate UPROPERTY)
+	// Play montage at configurable rate (default 2.0x — Lua 配置可覆盖，缺键回退 UPROPERTY)
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-		this, NAME_None, AttackMontage, MontagePlayRate);
+		this, NAME_None, AttackMontage, ReadConfigFloat(TEXT("MontagePlayRate"), MontagePlayRate));
 
 	// OnBlendOut + OnCompleted both fire on natural end — bind only OnCompleted to avoid double EndAbility
 	MontageTask->OnCompleted.AddDynamic(this, &UGA_MeleeAttack::OnMontageEnded);
@@ -188,10 +191,11 @@ void UGA_MeleeAttack::TryAdvanceCombo()
 void UGA_MeleeAttack::SetupWarpTarget()
 {
 	FMALungeParams Params;
-	Params.ConeHalfAngleDeg = ConeHalfAngleDeg;
-	Params.MaxLungeDistanceCm = MaxLungeDistanceCm;
-	Params.StopDistanceCm = StopDistanceCm;
-	MAWarpOps::SetupWarpTargetForAbility(this, WarpTargetName, Params, NoTargetDashCm);
+	Params.ConeHalfAngleDeg = ReadConfigFloat(TEXT("ConeHalfAngleDeg"), ConeHalfAngleDeg);
+	Params.MaxLungeDistanceCm = ReadConfigFloat(TEXT("MaxLungeDistanceCm"), MaxLungeDistanceCm);
+	Params.StopDistanceCm = ReadConfigFloat(TEXT("StopDistanceCm"), StopDistanceCm);
+	MAWarpOps::SetupWarpTargetForAbility(this, WarpTargetName, Params,
+		ReadConfigFloat(TEXT("NoTargetDashCm"), NoTargetDashCm));
 }
 
 void UGA_MeleeAttack::OnMontageEvent(FGameplayEventData EventData)
@@ -229,5 +233,7 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 	}
 	// Sweep/filter/apply shared with GA_DashSlash — see MAMeleeHitOps.
 	const FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffect, GetAbilityLevel());
-	MAMeleeHitOps::SweepAndApplyMeleeHit(Avatar, SourceASC, SpecHandle, TraceDistance, TraceRadius);
+	MAMeleeHitOps::SweepAndApplyMeleeHit(Avatar, SourceASC, SpecHandle,
+		ReadConfigFloat(TEXT("TraceDistance"), TraceDistance),
+		ReadConfigFloat(TEXT("TraceRadius"), TraceRadius));
 }
