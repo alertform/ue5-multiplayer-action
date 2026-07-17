@@ -30,7 +30,8 @@ public class MultiPlayerAction : ModuleRules
 			// Niagara burst template on GCN_ParticleBurst (blood splatter on melee hits)
 			"Niagara",
 			// Lua 配置外置（Lua 只当配置源，运行时热重载）—— UnLua 2.3.6
-			"UnLua"
+			// "Lua" 是 UnLua 的 External 模块，链接库不传递导出，需显式依赖
+			"UnLua", "Lua"
 		});
 	}
 }
