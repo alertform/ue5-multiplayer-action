@@ -86,4 +86,16 @@ void UBTService_UpdateTargetInfo::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 
 	const bool bInRange = PlayerPawn && BestDistSq <= AttackRange * AttackRange;
 	BB->SetValueAsBool(InRangeKey.SelectedKeyName, bInRange);
+
+	// 观测到目标 = 常驻 focus：接近/绕圈/后撤全程身体面向玩家（八向 strafe 补移动动画），
+	// ControlRotation 经 CharacterMovement 的期望朝向按 RotationRate 平滑转过去。
+	// 目标丢失（无人存活/死亡间隙）回落到路径朝向；死亡清理用同一优先级 ClearFocus。
+	if (PlayerPawn)
+	{
+		AIC->SetFocus(PlayerPawn, EAIFocusPriority::Gameplay);
+	}
+	else
+	{
+		AIC->ClearFocus(EAIFocusPriority::Gameplay);
+	}
 }

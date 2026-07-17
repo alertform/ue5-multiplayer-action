@@ -67,6 +67,18 @@ void AMATargetDummy::PostInitializeComponents()
 	{
 		MeshComp->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 	}
+
+	// 转向平滑：bUseControllerRotationYaw 会每帧硬拷 ControlRotation 的 yaw，
+	// BT 一设焦点朝向就瞬间掰过去。改走 CharacterMovement 的期望朝向插值 ——
+	// ControlRotation 仍是方向盘（focus/路径照旧驱动），但身体按 RotationRate
+	// 角速度转过去。攻击瞬间的强制对脸（直接 SetActorRotation 的那条路径）不受影响。
+	bUseControllerRotationYaw = false;
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->bOrientRotationToMovement = false;
+		Move->bUseControllerDesiredRotation = true;
+		Move->RotationRate = FRotator(0.f, 300.f, 0.f);
+	}
 }
 
 void AMATargetDummy::BeginPlay()
