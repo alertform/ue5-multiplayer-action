@@ -5,6 +5,7 @@
 #include "MAHealthBarWidget.generated.h"
 
 class UAbilitySystemComponent;
+class UImage;
 class UProgressBar;
 struct FOnAttributeChangeData;
 
@@ -106,4 +107,11 @@ private:
 
 	/** Force-build the rounded-box styles on both ProgressBars from the color properties. */
 	void ApplyBarStyles();
+
+	/** 描边独立成最上层：ProgressBar 的填充铺满整个控件矩形，会盖住画在同一矩形
+	 *  边缘的描边 —— 运行时往 ChipFill 所在 Overlay 顶部塞一个描边专用 UImage。 */
+	void EnsureOutlineLayer();
+
+	UPROPERTY()
+	TObjectPtr<UImage> OutlineImage;
 };

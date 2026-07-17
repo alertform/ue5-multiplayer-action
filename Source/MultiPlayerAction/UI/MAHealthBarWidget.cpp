@@ -1,6 +1,10 @@
 #include "UI/MAHealthBarWidget.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Image.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 #include "Components/ProgressBar.h"
 
 namespace
@@ -30,6 +34,7 @@ void UMAHealthBarWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
 	ApplyBarStyles();
+	EnsureOutlineLayer();
 }
 
 void UMAHealthBarWidget::ApplyBarStyles()
@@ -39,7 +44,9 @@ void UMAHealthBarWidget::ApplyBarStyles()
 	if (ChipFill)
 	{
 		FProgressBarStyle Style = ChipFill->GetWidgetStyle();
-		Style.BackgroundImage = MakeRoundedBrush(TrackColor, CornerRadius, OutlineColor, OutlineWidth);
+		// 轨道不再自带描边 —— 描边由 EnsureOutlineLayer 的顶层 UImage 独立绘制，
+		// 否则填充条会把画在同一矩形边缘的描边盖掉（"内条比外框宽"）。
+		Style.BackgroundImage = MakeRoundedBrush(TrackColor, CornerRadius, FLinearColor::Transparent, 0.f);
 		Style.FillImage = MakeRoundedBrush(ChipColor, CornerRadius, FLinearColor::Transparent, 0.f);
 		ChipFill->SetWidgetStyle(Style);
 		// UProgressBar's CDO defaults FillColorAndOpacity to BLUE (0, 0.5, 1) and MULTIPLIES
@@ -54,6 +61,29 @@ void UMAHealthBarWidget::ApplyBarStyles()
 		Style.FillImage = MakeRoundedBrush(HealthColor, CornerRadius, FLinearColor::Transparent, 0.f);
 		HealthFill->SetWidgetStyle(Style);
 		HealthFill->SetFillColorAndOpacity(FLinearColor::White);
+	}
+}
+
+void UMAHealthBarWidget::EnsureOutlineLayer()
+{
+	if (OutlineImage || !ChipFill)
+	{
+		return;
+	}
+	UOverlay* ParentOverlay = Cast<UOverlay>(ChipFill->GetParent());
+	if (!ParentOverlay || !WidgetTree)
+	{
+		return; // WBP 没按 Overlay 摆放就不加层（保持旧观感，不崩）
+	}
+
+	OutlineImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("BarOutline"));
+	// 体色全透明、只画描边的圆角盒 —— 叠在两条填充之上，框永远完整。
+	OutlineImage->SetBrush(MakeRoundedBrush(FLinearColor::Transparent, CornerRadius, OutlineColor, OutlineWidth));
+	OutlineImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (UOverlaySlot* OutlineSlot = ParentOverlay->AddChildToOverlay(OutlineImage))
+	{
+		OutlineSlot->SetHorizontalAlignment(HAlign_Fill);
+		OutlineSlot->SetVerticalAlignment(VAlign_Fill);
 	}
 }
 
