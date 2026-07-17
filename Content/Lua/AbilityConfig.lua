@@ -4,7 +4,7 @@ return {
     MeleeAttack = {
         TraceRadius      = 50,
         TraceDistance    = 150,
-        MontagePlayRate  = 2.0,
+        MontagePlayRate  = 1.3,   -- 2.0 时挥刀过快失真；1.3 = 爽快与自然的平衡点
         ConeHalfAngleDeg = 35,
         MaxLungeDistanceCm = 350,
         StopDistanceCm   = 120,
