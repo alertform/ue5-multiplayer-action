@@ -45,8 +45,13 @@ void UMAAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			// replicates (COND_SkipOwner), so simulated proxies strafe in sync. A speed gate with a
 			// lower exit band (hysteresis) keeps a locked-on but near-stationary character on the
 			// idle/free-run pose instead of dithering into a zero-speed strafe.
+			// Players enter the strafe set via the replicated lock-on flag. AI pawns (not
+			// AMultiPlayerActionCharacter) face their target through ControlRotation while
+			// circling/approaching, so every moving direction belongs in the 8-way set too —
+			// without this they slide sideways playing the forward run. Focus-less pathing is
+			// unaffected: control rotation follows the path, Direction≈0 -> forward clip.
 			const AMultiPlayerActionCharacter* MACharacter = Cast<AMultiPlayerActionCharacter>(PawnOwner);
-			const bool bStrafeMode = MACharacter && MACharacter->IsStrafeMode();
+			const bool bStrafeMode = MACharacter ? MACharacter->IsStrafeMode() : true;
 			constexpr float ExitBand = 0.7f; // exit threshold = entry * 0.7
 			const float SpeedGate = StrafeSpeedThreshold * (bStrafing ? ExitBand : 1.f);
 			bStrafing = bStrafeMode && Velocity.Size2D() > SpeedGate;
