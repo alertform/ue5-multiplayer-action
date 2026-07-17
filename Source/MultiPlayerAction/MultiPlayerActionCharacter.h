@@ -97,6 +97,10 @@ class AMultiPlayerActionCharacter : public ACharacter, public IAbilitySystemInte
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LockOnAction;
 
+	/** Interact Input Action — Started opens NPC dialogue (T / Gamepad Y)；路由到 PC 的 OnInteractPressed */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* InteractAction;
+
 public:
 	AMultiPlayerActionCharacter(const FObjectInitializer& ObjectInitializer);
 
@@ -183,6 +187,8 @@ protected:
 
 	void OnScoreboardPressed();
 	void OnScoreboardReleased();
+
+	void OnInteractInput();
 
 	/** Toggle soft-lock onto the best target in front; release if already locked. */
 	void OnLockOnInput();

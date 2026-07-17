@@ -28,7 +28,6 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void OnRep_PlayerState() override;
-	virtual void SetupInputComponent() override;
 
 	/** Dev cheat: apply damage to own Health (bypasses GE pipeline) — 控制台输 DamageSelf 10 */
 	UFUNCTION(Exec)
@@ -53,6 +52,9 @@ public:
 	void Client_OnRespawnScheduled(float RespawnEndServerTime);
 
 	// ===== NPC LLM 流式对话（server 代理 Kimi，见 UMADialogueSubsystem）=====
+
+	/** 交互输入（Character 的 IA_Interact Started 路由至此）：搜寻半径内最近 NPC，找到即开窗。 */
+	void OnInteractPressed();
 
 	/** widget → PC：玩家回车提交一条消息（本地上屏 + 发给 server）。 */
 	void SubmitDialogueText(const FString& Text);
@@ -117,9 +119,6 @@ private:
 	void EnsureHUDInitialized();
 
 	// ===== NPC LLM 对话（客户端侧状态）=====
-
-	/** T 键：搜寻交互半径内最近的对话 NPC，找到即开窗。 */
-	void OnInteractPressed();
 
 	UMADialogueComponent* FindNearbyDialogueNpc() const;
 

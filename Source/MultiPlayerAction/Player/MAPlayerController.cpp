@@ -20,6 +20,9 @@
 #include "UObject/UObjectIterator.h"
 #include "GameFramework/Pawn.h"
 
+// 对话交互的客户端侧诊断——默认静默，测试时 -LogCmds="LogMADialogueInput Verbose" 开启
+DEFINE_LOG_CATEGORY_STATIC(LogMADialogueInput, Log, All);
+
 AMAPlayerController::AMAPlayerController()
 {
 	// Bind WBP_HUD asset directly here so the C++ class is self-sufficient
@@ -60,19 +63,12 @@ void AMAPlayerController::OnRep_PlayerState()
 	EnsureHUDInitialized();
 }
 
-void AMAPlayerController::SetupInputComponent()
-{
-	Super::SetupInputComponent();
-
-	// 对话交互键走 PC 层 legacy BindKey（与角色的 Enhanced Input 并存）——
-	// UI 域按键不动 IMC 资产；对话窗打开后输入模式切 UIOnly，此绑定天然失效。
-	InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AMAPlayerController::OnInteractPressed);
-}
-
 // ===== NPC LLM 流式对话 =====
 
 void AMAPlayerController::OnInteractPressed()
 {
+	UE_LOG(LogMADialogueInput, Verbose, TEXT("OnInteractPressed: bOpen=%d pawn=%s"),
+		bDialogueOpen ? 1 : 0, GetPawn() ? *GetPawn()->GetActorLocation().ToCompactString() : TEXT("none"));
 	if (bDialogueOpen)
 	{
 		return;
@@ -128,6 +124,8 @@ UMADialogueComponent* AMAPlayerController::FindNearbyDialogueNpc() const
 		}
 		const float DistSq = FVector::DistSquared(
 			MyPawn->GetActorLocation(), Comp->GetOwner()->GetActorLocation());
+		UE_LOG(LogMADialogueInput, Verbose, TEXT("candidate %s dist=%.0f radius=%.0f"),
+			*Comp->NpcName, FMath::Sqrt(DistSq), Comp->InteractRadius);
 		if (DistSq <= FMath::Square(Comp->InteractRadius) && DistSq < BestDistSq)
 		{
 			Best = Comp;

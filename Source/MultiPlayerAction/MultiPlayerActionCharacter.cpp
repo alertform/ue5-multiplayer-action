@@ -349,6 +349,12 @@ void AMultiPlayerActionCharacter::SetupPlayerInputComponent(UInputComponent* Pla
 			EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Completed, this, &AMultiPlayerActionCharacter::OnScoreboardReleased);
 		}
 
+		// Interact — single press opens NPC dialogue (UI-domain, routed to the PC)
+		if (InteractAction)
+		{
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AMultiPlayerActionCharacter::OnInteractInput);
+		}
+
 		// Lock-on — single press toggles target lock (R3 / Middle Mouse). While locked, the
 		// right-stick flick that switches target is handled inside Look() via the component.
 		if (LockOnAction)
@@ -515,6 +521,14 @@ void AMultiPlayerActionCharacter::OnScoreboardPressed()
 	if (AMAPlayerController* PC = Cast<AMAPlayerController>(Controller))
 	{
 		PC->SetScoreboardVisible(true);
+	}
+}
+
+void AMultiPlayerActionCharacter::OnInteractInput()
+{
+	if (AMAPlayerController* PC = Cast<AMAPlayerController>(Controller))
+	{
+		PC->OnInteractPressed();
 	}
 }
 
