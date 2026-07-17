@@ -56,6 +56,17 @@ void AMATargetDummy::PostInitializeComponents()
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 	}
+
+	// AI 身体不许推玩家的弹簧臂：忽略 Camera 探测通道。放这里（而非构造函数）
+	// 是因为已存盘 BP 子类的碰撞默认值会覆盖构造函数改动（预测组件类换血的老教训）。
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	}
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	}
 }
 
 void AMATargetDummy::BeginPlay()
