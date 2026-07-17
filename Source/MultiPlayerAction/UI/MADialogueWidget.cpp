@@ -99,6 +99,10 @@ void UMADialogueWidget::NativeOnInitialized()
 	// --- 输入框 ---
 	InputBox = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(), TEXT("DialogueInput"));
 	InputBox->SetHintText(FText::FromString(TEXT("输入想说的话，回车发送，Esc 关闭……")));
+	// 默认 bClearKeyboardFocusOnCommit=true 会在回车提交后自动清焦点，
+	// 派生出第二个 OnCleared 提交事件 —— 会被下面的 Esc 分支误判成关窗。
+	// 关掉它：焦点留在框内，顺带支持连续输入。
+	InputBox->SetClearKeyboardFocusOnCommit(false);
 	InputBox->OnTextCommitted.AddDynamic(this, &UMADialogueWidget::OnInputCommitted);
 	Stack->AddChildToVerticalBox(InputBox);
 }

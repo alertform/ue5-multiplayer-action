@@ -21,9 +21,9 @@ public:
 	UPROPERTY(EditAnywhere, Config, Category = "Endpoint")
 	FString BaseUrl = TEXT("https://api.moonshot.cn/v1");
 
-	/** 模型 ID。kimi-latest 恒指向最新 Kimi；可换 kimi-k2 系列或其他兼容端点的模型。 */
+	/** 模型 ID。实测账号可用列表见 GET /v1/models（kimi-latest 并非所有账号可用，会 404）。 */
 	UPROPERTY(EditAnywhere, Config, Category = "Endpoint")
-	FString Model = TEXT("kimi-latest");
+	FString Model = TEXT("kimi-k3");
 
 	/** 存放 API key 的环境变量名（server 机器上设置，绝不写进任何文件）。 */
 	UPROPERTY(EditAnywhere, Config, Category = "Endpoint")
