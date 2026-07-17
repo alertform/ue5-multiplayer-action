@@ -28,7 +28,9 @@ public class MultiPlayerAction : ModuleRules
 			// Root-motion warping for the dash slash
 			"MotionWarping",
 			// Niagara burst template on GCN_ParticleBurst (blood splatter on melee hits)
-			"Niagara"
+			"Niagara",
+			// Lua 配置外置（Lua 只当配置源，运行时热重载）—— UnLua 2.3.6
+			"UnLua"
 		});
 	}
 }
