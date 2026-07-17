@@ -5,6 +5,11 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystem/MAGameplayTags.h"
 #include "Engine/OverlapResult.h"
+#include "DrawDebugHelpers.h"
+
+static TAutoConsoleVariable<int32> CVarFireballDebugExplosion(
+	TEXT("ma.Fireball.DebugExplosion"), 0,
+	TEXT("1 = draw the AoE damage sphere on each explosion (server viewport, 2s). The VFX size is fixed; this shows the actual gameplay radius (Lua-tunable)."));
 
 AMAProjectile::AMAProjectile()
 {
@@ -99,6 +104,14 @@ void AMAProjectile::Explode(const FVector& Location, const FVector& Normal)
 		Overlaps, Location, FQuat::Identity,
 		FCollisionObjectQueryParams(ECC_Pawn),
 		FCollisionShape::MakeSphere(ExplosionRadius), QueryParams);
+
+#if ENABLE_DRAW_DEBUG
+	// 特效大小固定，肉眼看不出 Lua 调过的判定半径——开关打开时把真实 AoE 画出来。
+	if (CVarFireballDebugExplosion.GetValueOnGameThread() != 0)
+	{
+		DrawDebugSphere(GetWorld(), Location, ExplosionRadius, 24, FColor::Orange, false, 2.f);
+	}
+#endif
 
 	// A pawn can report multiple components — dedupe actors before applying damage.
 	TSet<AActor*> DamagedActors;
