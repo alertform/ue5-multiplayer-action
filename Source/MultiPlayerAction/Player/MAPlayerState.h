@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
+#include "Narrative/MAQuestTypes.h"
 #include "MAPlayerState.generated.h"
 
 class UMAAbilitySystemComponent;
@@ -36,6 +37,15 @@ public:
 	void AddKill() { ++Kills; }
 	void AddDeath() { ++Deaths; }
 
+	/** 当前叙事任务（复制；HUD 轮询读）。服务器经 Set/GetMutable 写。 */
+	const FMAQuestState& GetActiveQuest() const { return ActiveQuest; }
+	void SetActiveQuest(const FMAQuestState& InQuest) { ActiveQuest = InQuest; }
+	FMAQuestState& GetMutableActiveQuest() { return ActiveQuest; }
+
+	/** 本场已发任务数（server-only 预算账本，不复制）。 */
+	int32 GetQuestsIssued() const { return QuestsIssued; }
+	void IncrementQuestsIssued() { ++QuestsIssued; }
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
@@ -54,6 +64,13 @@ protected:
 	UPROPERTY(Replicated)
 	int32 Deaths = 0;
 
+	/** 叙事任务状态；同 Kills/Deaths，对局重启随 PlayerState 重建自然清零。 */
+	UPROPERTY(Replicated)
+	FMAQuestState ActiveQuest;
+
 private:
 	bool bStartupAbilitiesGranted = false;
+
+	/** 每局 give_quest 预算计数（MAQuestRules::MaxQuestsPerMatch 上限）。 */
+	int32 QuestsIssued = 0;
 };

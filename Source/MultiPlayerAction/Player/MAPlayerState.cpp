@@ -27,4 +27,5 @@ void AMAPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 	DOREPLIFETIME(AMAPlayerState, Kills);
 	DOREPLIFETIME(AMAPlayerState, Deaths);
+	DOREPLIFETIME(AMAPlayerState, ActiveQuest);
 }
