@@ -88,3 +88,6 @@ Plugins/UnrealAgentMCP/
 
 # Agent-side asset download staging (raw files; imported uassets live in Content/)
 Import_Staging/
+
+# Packaged builds (BuildCookRun -archivedirectory output)
+Builds/
