@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "LLM/MALLMTypes.h"
 
 /**
  * Server-Sent Events 字节级增量解析器。
@@ -30,6 +31,15 @@ private:
 	void ConsumeLine(const uint8* LineStart, int32 LineLen, TArray<FString>& OutEvents);
 };
 
+/** delta.tool_calls 数组的一个元素（跨 chunk 按 Index 聚合出完整调用）。 */
+struct FMAToolCallDelta
+{
+	int32 Index = -1;
+	FString Id;
+	FString Name;
+	FString ArgumentsFragment;
+};
+
 /** delta.content 为一个流式 chunk 解出的增量文本；FinishReason 非空表示生成结束。
  *  末尾 chunk 可能携带 usage 统计（-1 = 本 chunk 未携带）。 */
 struct FMAOpenAIChunk
@@ -38,6 +48,10 @@ struct FMAOpenAIChunk
 	FString FinishReason;
 	int32 PromptTokens = -1;
 	int32 CompletionTokens = -1;
+
+	/** 本 chunk 携带的 tool_calls 增量（首帧带 Id/Name，续帧只有 ArgumentsFragment）。 */
+	TArray<FMAToolCallDelta> ToolCallDeltas;
+
 	bool bValid = false;
 };
 
@@ -56,3 +70,20 @@ namespace MAOpenAISSE
 	/** 从 {"error":{"message":...}} 错误体提取人类可读信息；无则返回空串。 */
 	MULTIPLAYERACTION_API FString ExtractErrorMessage(const FString& Body);
 }
+
+/**
+ * 跨 chunk 聚合 tool_calls 增量：同 Index 的片段按序拼接 arguments。
+ * 纯逻辑无 UObject，游戏线程独占使用。
+ * 测试：MultiPlayerAction.LLM.ToolCallAggregator
+ */
+class MULTIPLAYERACTION_API FMAToolCallAggregator
+{
+public:
+	void Consume(const FMAToolCallDelta& Delta);
+	bool HasCalls() const { return Calls.Num() > 0; }
+	const TArray<FMALLMToolCall>& GetCalls() const { return Calls; }
+	void Reset() { Calls.Reset(); }
+
+private:
+	TArray<FMALLMToolCall> Calls;
+};

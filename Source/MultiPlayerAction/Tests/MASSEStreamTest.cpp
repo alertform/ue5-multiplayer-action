@@ -189,4 +189,85 @@ bool FMAOpenAIChunkTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ---------------------------------------------------------------------------
+// delta.tool_calls 解析 + 跨 chunk 聚合（帧样本取自 2026-07-19 kimi-k2.6 实测）
+// ---------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMAToolCallParseTest,
+	"MultiPlayerAction.LLM.ToolCallParse",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMAToolCallParseTest::RunTest(const FString& Parameters)
+{
+	// 首帧：id + name + 空 arguments。
+	const FString First = TEXT("{\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"give_quest_0\",\"type\":\"function\",\"function\":{\"name\":\"give_quest\",\"arguments\":\"\"}}]},\"finish_reason\":null}]}");
+	FMAOpenAIChunk C1 = MAOpenAISSE::ParseChunk(First);
+	TestTrue(TEXT("chunk valid"), C1.bValid);
+	if (TestEqual(TEXT("one delta"), C1.ToolCallDeltas.Num(), 1))
+	{
+		TestEqual(TEXT("index"), C1.ToolCallDeltas[0].Index, 0);
+		TestEqual(TEXT("id"), C1.ToolCallDeltas[0].Id, TEXT("give_quest_0"));
+		TestEqual(TEXT("name"), C1.ToolCallDeltas[0].Name, TEXT("give_quest"));
+	}
+
+	// 续帧：只有 arguments 片段。
+	const FString Frag = TEXT("{\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"kill\"}}]},\"finish_reason\":null}]}");
+	FMAOpenAIChunk C2 = MAOpenAISSE::ParseChunk(Frag);
+	if (TestEqual(TEXT("fragment delta"), C2.ToolCallDeltas.Num(), 1))
+	{
+		TestEqual(TEXT("fragment text"), C2.ToolCallDeltas[0].ArgumentsFragment, TEXT("{\"kill"));
+		TestEqual(TEXT("fragment has no id"), C2.ToolCallDeltas[0].Id, FString());
+	}
+
+	// 纯 reasoning 帧：无 content 无 tool_calls，依旧 bValid 且两者为空。
+	const FString Reasoning = TEXT("{\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"thinking...\"},\"finish_reason\":null}]}");
+	FMAOpenAIChunk C3 = MAOpenAISSE::ParseChunk(Reasoning);
+	TestTrue(TEXT("reasoning chunk valid"), C3.bValid);
+	TestEqual(TEXT("reasoning no content"), C3.Content, FString());
+	TestEqual(TEXT("reasoning no tool deltas"), C3.ToolCallDeltas.Num(), 0);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMAToolCallAggregatorTest,
+	"MultiPlayerAction.LLM.ToolCallAggregator",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMAToolCallAggregatorTest::RunTest(const FString& Parameters)
+{
+	FMAToolCallAggregator Agg;
+	TestFalse(TEXT("empty at start"), Agg.HasCalls());
+
+	FMAToolCallDelta First;
+	First.Index = 0; First.Id = TEXT("give_quest_0"); First.Name = TEXT("give_quest");
+	Agg.Consume(First);
+
+	const TCHAR* Fragments[] = { TEXT("{\"kill_count\":"), TEXT("5"), TEXT("}") };
+	for (const TCHAR* Frag : Fragments)
+	{
+		FMAToolCallDelta D;
+		D.Index = 0; D.ArgumentsFragment = Frag;
+		Agg.Consume(D);
+	}
+
+	if (TestTrue(TEXT("has calls"), Agg.HasCalls()) &&
+		TestEqual(TEXT("one call"), Agg.GetCalls().Num(), 1))
+	{
+		const FMALLMToolCall& Call = Agg.GetCalls()[0];
+		TestEqual(TEXT("id"), Call.Id, TEXT("give_quest_0"));
+		TestEqual(TEXT("name"), Call.Name, TEXT("give_quest"));
+		TestEqual(TEXT("arguments joined"), Call.ArgumentsJson, TEXT("{\"kill_count\":5}"));
+	}
+
+	// 乱序/缺首帧防御：直接来 index=2 的片段不崩，产出该槽位的（无名）调用。
+	FMAToolCallDelta Stray;
+	Stray.Index = 2; Stray.ArgumentsFragment = TEXT("{}");
+	Agg.Consume(Stray);
+	TestEqual(TEXT("sparse index grows array"), Agg.GetCalls().Num(), 3);
+
+	Agg.Reset();
+	TestFalse(TEXT("reset clears"), Agg.HasCalls());
+	return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

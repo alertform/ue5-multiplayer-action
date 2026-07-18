@@ -107,6 +107,30 @@ FMAOpenAIChunk ParseChunk(const FString& Payload)
 	if ((*Choice)->TryGetObjectField(TEXT("delta"), Delta))
 	{
 		(*Delta)->TryGetStringField(TEXT("content"), Out.Content);
+
+		// tool_calls 增量：首帧带 index/id/name，续帧只有 arguments 片段（k2.6 实测格式）。
+		const TArray<TSharedPtr<FJsonValue>>* ToolCallArr = nullptr;
+		if ((*Delta)->TryGetArrayField(TEXT("tool_calls"), ToolCallArr))
+		{
+			for (const TSharedPtr<FJsonValue>& Val : *ToolCallArr)
+			{
+				const TSharedPtr<FJsonObject>* CallObj = nullptr;
+				if (!Val->TryGetObject(CallObj))
+				{
+					continue;
+				}
+				FMAToolCallDelta ToolDelta;
+				(*CallObj)->TryGetNumberField(TEXT("index"), ToolDelta.Index);
+				(*CallObj)->TryGetStringField(TEXT("id"), ToolDelta.Id);
+				const TSharedPtr<FJsonObject>* FnObj = nullptr;
+				if ((*CallObj)->TryGetObjectField(TEXT("function"), FnObj))
+				{
+					(*FnObj)->TryGetStringField(TEXT("name"), ToolDelta.Name);
+					(*FnObj)->TryGetStringField(TEXT("arguments"), ToolDelta.ArgumentsFragment);
+				}
+				Out.ToolCallDeltas.Add(MoveTemp(ToolDelta));
+			}
+		}
 	}
 	(*Choice)->TryGetStringField(TEXT("finish_reason"), Out.FinishReason);
 
@@ -149,3 +173,23 @@ FString ExtractErrorMessage(const FString& Body)
 }
 
 } // namespace MAOpenAISSE
+
+void FMAToolCallAggregator::Consume(const FMAToolCallDelta& Delta)
+{
+	// 缺 index 的异常帧按 0 处理；稀疏 index 直接补位 —— 防御模型/端点的畸形输出。
+	const int32 Index = FMath::Max(0, Delta.Index);
+	while (Calls.Num() <= Index)
+	{
+		Calls.AddDefaulted();
+	}
+	FMALLMToolCall& Call = Calls[Index];
+	if (!Delta.Id.IsEmpty())
+	{
+		Call.Id = Delta.Id;
+	}
+	if (!Delta.Name.IsEmpty())
+	{
+		Call.Name = Delta.Name;
+	}
+	Call.ArgumentsJson += Delta.ArgumentsFragment;
+}
