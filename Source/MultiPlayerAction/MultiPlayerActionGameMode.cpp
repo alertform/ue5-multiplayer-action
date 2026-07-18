@@ -7,6 +7,7 @@
 #include "Player/MAPlayerController.h"
 #include "AI/MATargetDummy.h"
 #include "AbilitySystemComponent.h"
+#include "Narrative/MANarrativeSubsystem.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -81,6 +82,12 @@ void AMultiPlayerActionGameMode::NotifyKill(AActor* KillerActor, AActor* VictimA
 	if (KillerPS && KillerPS != VictimPS)
 	{
 		KillerPS->AddKill(); // suicides count the death but never the kill
+
+		// 叙事任务进度与击杀计分同源 —— 同一处路由，保证口径一致。
+		if (UMANarrativeSubsystem* Narrative = GetWorld()->GetSubsystem<UMANarrativeSubsystem>())
+		{
+			Narrative->NotifyKill(KillerPS);
+		}
 	}
 
 	// Kill feed: dummies have no PlayerState — present them by a fixed name. A suicide
