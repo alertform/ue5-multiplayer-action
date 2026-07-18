@@ -7,6 +7,10 @@
 #include "Interfaces/IHttpResponse.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+#if PLATFORM_WINDOWS
+#include "Windows/WindowsHWrapper.h"
+#include "Windows/WindowsPlatformMisc.h"
+#endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogMALLM, Log, All);
 
@@ -52,7 +56,19 @@ TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> FMALLMStreamRequest::Start(
 
 	const UMALLMSettings* S = UMALLMSettings::Get();
 
-	const FString ApiKey = FPlatformMisc::GetEnvironmentVariable(*S->ApiKeyEnvVar).TrimStartAndEnd();
+	FString ApiKey = FPlatformMisc::GetEnvironmentVariable(*S->ApiKeyEnvVar).TrimStartAndEnd();
+#if PLATFORM_WINDOWS
+	// 进程环境是启动时的快照：setx 之后没重启的父进程（或忘了注入的脚本启动链）
+	// 读不到新变量。Windows 上回退现读注册表的用户级环境（setx 的落点）。
+	if (ApiKey.IsEmpty())
+	{
+		FString RegValue;
+		if (FWindowsPlatformMisc::QueryRegKey(HKEY_CURRENT_USER, TEXT("Environment"), *S->ApiKeyEnvVar, RegValue))
+		{
+			ApiKey = RegValue.TrimStartAndEnd();
+		}
+	}
+#endif
 	if (ApiKey.IsEmpty())
 	{
 		OutError = FString::Printf(TEXT("服务器未配置环境变量 %s，无法连接对话服务"), *S->ApiKeyEnvVar);
