@@ -111,7 +111,7 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 			}
 		}
 	};
-	Callbacks.OnComplete = [WeakThis, WeakPC, Id](const FString& FullText)
+	Callbacks.OnComplete = [WeakThis, WeakPC, Id](const FString& FullText, const TArray<FMALLMToolCall>& ToolCalls)
 	{
 		UMADialogueSubsystem* Self = WeakThis.Get();
 		AMAPlayerController* Controller = WeakPC.Get();

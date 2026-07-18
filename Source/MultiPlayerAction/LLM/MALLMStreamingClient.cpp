@@ -85,7 +85,7 @@ TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> FMALLMStreamRequest::Start(
 		BodyParams.bSendTemperature = true;
 		BodyParams.Temperature = S->Temperature;
 	}
-	Request->SetContentAsString(MALLM::BuildChatRequestBody(Messages, BodyParams, TArray<FMALLMToolSpec>()));
+	Request->SetContentAsString(MALLM::BuildChatRequestBody(Messages, BodyParams, Overrides.Tools));
 
 	TWeakPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> WeakSelf = Self;
 
@@ -177,7 +177,7 @@ void FMALLMStreamRequest::ProcessBytes(TArray<uint8> Bytes)
 			}
 			if (Callbacks.OnComplete)
 			{
-				Callbacks.OnComplete(Accumulated);
+				Callbacks.OnComplete(Accumulated, ToolCallAggregator.GetCalls());
 			}
 			return;
 		}
@@ -187,6 +187,10 @@ void FMALLMStreamRequest::ProcessBytes(TArray<uint8> Bytes)
 		{
 			UE_LOG(LogMALLM, Verbose, TEXT("忽略无法解析的流式载荷：%s"), *Event.Left(200));
 			continue;
+		}
+		for (const FMAToolCallDelta& ToolDelta : Chunk.ToolCallDeltas)
+		{
+			ToolCallAggregator.Consume(ToolDelta);
 		}
 		if (Chunk.PromptTokens >= 0)
 		{
@@ -227,7 +231,7 @@ void FMALLMStreamRequest::HandleRequestComplete(FHttpRequestPtr /*Req*/, FHttpRe
 	{
 		if (Callbacks.OnComplete)
 		{
-			Callbacks.OnComplete(Accumulated);
+			Callbacks.OnComplete(Accumulated, ToolCallAggregator.GetCalls());
 		}
 		return;
 	}

@@ -21,8 +21,8 @@ public:
 	{
 		/** 每批增量文本（游戏线程）。 */
 		TFunction<void(const FString&)> OnDelta;
-		/** 生成完整结束，参数为全文（游戏线程）。 */
-		TFunction<void(const FString&)> OnComplete;
+		/** 生成完整结束：全文 + 本轮聚合出的工具调用（无则空数组；游戏线程）。 */
+		TFunction<void(const FString&, const TArray<FMALLMToolCall>&)> OnComplete;
 		/** 失败，参数为可直接展示给玩家的中文信息（游戏线程）。 */
 		TFunction<void(const FString&)> OnError;
 	};
@@ -33,6 +33,8 @@ public:
 		int32 MaxTokens = -1;
 		float Temperature = -1.f;
 		FString Model;
+		/** 随请求声明的工具（空 = 纯对话，不写 tools 字段）。 */
+		TArray<FMALLMToolSpec> Tools;
 	};
 
 	/**
@@ -58,6 +60,9 @@ private:
 	TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> HttpRequest;
 	FCallbacks Callbacks;
 	FMASSEStreamParser Parser;
+
+	/** 跨 chunk 聚合 tool_calls 增量；完成时随 OnComplete 一并交出。 */
+	FMAToolCallAggregator ToolCallAggregator;
 
 	/** 已流出的全文（OnComplete 的参数）。 */
 	FString Accumulated;

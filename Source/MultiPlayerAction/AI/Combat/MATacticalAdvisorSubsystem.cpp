@@ -104,7 +104,7 @@ void UMATacticalAdvisorSubsystem::Tick(float DeltaTime)
 
 	TWeakObjectPtr<UMATacticalAdvisorSubsystem> WeakThis(this);
 	FMALLMStreamRequest::FCallbacks Callbacks;
-	Callbacks.OnComplete = [WeakThis](const FString& FullText)
+	Callbacks.OnComplete = [WeakThis](const FString& FullText, const TArray<FMALLMToolCall>& /*ToolCalls*/)
 	{
 		if (UMATacticalAdvisorSubsystem* Self = WeakThis.Get())
 		{
