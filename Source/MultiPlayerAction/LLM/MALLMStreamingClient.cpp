@@ -25,8 +25,15 @@ namespace
 		TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 		Root->SetStringField(TEXT("model"), Overrides.Model.IsEmpty() ? S.Model : Overrides.Model);
 		Root->SetBoolField(TEXT("stream"), true);
-		Root->SetNumberField(TEXT("temperature"),
-			Overrides.Temperature >= 0.f ? Overrides.Temperature : S.Temperature);
+		// temperature 默认省缺（用模型服务端默认值）：kimi-k3 携带非 1 的值会拒绝整个请求。
+		if (Overrides.Temperature >= 0.f)
+		{
+			Root->SetNumberField(TEXT("temperature"), Overrides.Temperature);
+		}
+		else if (S.bSendTemperature)
+		{
+			Root->SetNumberField(TEXT("temperature"), S.Temperature);
+		}
 		Root->SetNumberField(TEXT("max_tokens"),
 			Overrides.MaxTokens > 0 ? Overrides.MaxTokens : S.MaxTokens);
 

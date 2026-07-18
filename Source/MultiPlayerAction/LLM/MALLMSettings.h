@@ -29,9 +29,16 @@ public:
 	UPROPERTY(EditAnywhere, Config, Category = "Endpoint")
 	FString ApiKeyEnvVar = TEXT("MOONSHOT_API_KEY");
 
-	/** Kimi K2 官方推荐 0.6。 */
-	UPROPERTY(EditAnywhere, Config, Category = "Sampling", meta = (ClampMin = "0.0", ClampMax = "2.0"))
-	float Temperature = 0.6f;
+	/**
+	 * 是否随请求发送 temperature。默认关：部分模型（如 kimi-k3）只接受服务端默认值，
+	 * 携带其他值会整个请求被拒（"invalid temperature: only 1 is allowed"）。
+	 */
+	UPROPERTY(EditAnywhere, Config, Category = "Sampling")
+	bool bSendTemperature = false;
+
+	/** 仅在 bSendTemperature 开启时携带。注意 kimi-k3 只接受 1.0；K2 官方推荐 0.6。 */
+	UPROPERTY(EditAnywhere, Config, Category = "Sampling", meta = (ClampMin = "0.0", ClampMax = "2.0", EditCondition = "bSendTemperature"))
+	float Temperature = 1.0f;
 
 	/** 单次回复 token 上限（NPC 台词短，无需大值）。 */
 	UPROPERTY(EditAnywhere, Config, Category = "Sampling", meta = (ClampMin = "16", ClampMax = "8192"))
