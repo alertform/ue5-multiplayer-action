@@ -3,6 +3,7 @@
 #include "Dialogue/MADialogueComponent.h"
 #include "LLM/MALLMSettings.h"
 #include "LLM/MALLMStreamingClient.h"
+#include "Narrative/MANarrativeSubsystem.h"
 #include "Player/MAPlayerController.h"
 #include "GameFramework/Pawn.h"
 
@@ -83,6 +84,19 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 	Session->History.Emplace(EMALLMRole::User, MoveTemp(Clean));
 	TrimHistory(*Session);
 
+	// 任务状态每轮都会变 —— 每次请求前重刷 system prompt 里的任务状态行，
+	// 模型才知道当前能不能发任务（发过的会被校验管线拒，但先让它别乱试）。
+	if (const UMADialogueComponent* Npc = Session->Npc.Get())
+	{
+		FString SystemPrompt = BuildSystemPrompt(*Npc);
+		if (UMANarrativeSubsystem* Narrative = GetWorld()->GetSubsystem<UMANarrativeSubsystem>())
+		{
+			SystemPrompt += FString::Printf(TEXT("\n当前玩家任务状态：%s。"),
+				*Narrative->DescribeQuestState(PC));
+		}
+		Session->History[0].Content = MoveTemp(SystemPrompt);
+	}
+
 	const int32 Id = ++Session->MessageId;
 	Session->PendingDeltas.Reset();
 	Session->StreamedSoFar.Reset();
@@ -125,7 +139,42 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 			return;
 		}
 		Self->FlushDeltas(Controller, *S);
-		S->History.Emplace(EMALLMRole::Assistant, FullText);
+
+		FMALLMMessage AssistantMsg(EMALLMRole::Assistant, FullText);
+		AssistantMsg.ToolCalls = ToolCalls;
+		S->History.Add(MoveTemp(AssistantMsg));
+
+		// 工具调用轮：逐个过叙事校验管线执行，结果以 tool 消息回填历史 ——
+		// 拒绝原因也回填，模型在后续台词里自然圆场。
+		FString SpokenFallback;
+		if (ToolCalls.Num() > 0)
+		{
+			UMANarrativeSubsystem* Narrative = Self->GetWorld()
+				? Self->GetWorld()->GetSubsystem<UMANarrativeSubsystem>() : nullptr;
+			for (const FMALLMToolCall& Call : ToolCalls)
+			{
+				FString SpokenLine;
+				FMALLMMessage ToolMsg(EMALLMRole::Tool, Narrative
+					? Narrative->ExecuteToolCall(Controller, Call, SpokenLine)
+					: TEXT("失败：叙事系统不可用。"));
+				ToolMsg.ToolCallId = Call.Id;
+				S->History.Add(MoveTemp(ToolMsg));
+				if (!SpokenLine.IsEmpty())
+				{
+					SpokenFallback = SpokenLine;
+				}
+			}
+		}
+
+		// 工具调用轮 content 为空（k2.6 实测）—— 用 quest_line 当台词整段推给客户端，
+		// 并补进历史，下一轮模型才知道自己说过这句话。
+		if (FullText.IsEmpty() && !SpokenFallback.IsEmpty())
+		{
+			S->PendingDeltas += SpokenFallback;
+			Self->FlushDeltas(Controller, *S);
+			S->History.Emplace(EMALLMRole::Assistant, SpokenFallback);
+		}
+
 		S->ActiveRequest.Reset();
 		S->StreamedSoFar.Reset();
 		Controller->Client_DialogueCompleted(Id);
@@ -153,8 +202,12 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 		Controller->Client_DialogueError(Message);
 	};
 
+	// 声明叙事工具 —— 模型可在对话中发起 give_quest，执行前过服务器校验管线。
+	FMALLMStreamRequest::FOverrides Overrides;
+	Overrides.Tools.Add(UMANarrativeSubsystem::GetGiveQuestToolSpec());
+
 	FString StartError;
-	Session->ActiveRequest = FMALLMStreamRequest::Start(Session->History, MoveTemp(Callbacks), StartError);
+	Session->ActiveRequest = FMALLMStreamRequest::Start(Session->History, MoveTemp(Callbacks), StartError, Overrides);
 	if (!Session->ActiveRequest.IsValid())
 	{
 		PC->Client_DialogueError(StartError);
@@ -255,8 +308,19 @@ void UMADialogueSubsystem::TrimHistory(FSession& Session)
 {
 	const int32 MaxMessages = UMALLMSettings::Get()->MaxHistoryMessages;
 	// History[0] 是 system，永远保留；超限时从最旧的非 system 消息开始丢。
+	// 带 tool_calls 的 assistant 必须连同其后的 tool 结果一起丢 ——
+	// 历史里出现孤儿 tool 消息会被 API 整个请求拒收（400）。
 	while (Session.History.Num() > MaxMessages + 1)
 	{
-		Session.History.RemoveAt(1);
+		int32 RemoveCount = 1;
+		if (Session.History[1].Role == EMALLMRole::Assistant && Session.History[1].ToolCalls.Num() > 0)
+		{
+			while (Session.History.IsValidIndex(1 + RemoveCount)
+				&& Session.History[1 + RemoveCount].Role == EMALLMRole::Tool)
+			{
+				++RemoveCount;
+			}
+		}
+		Session.History.RemoveAt(1, RemoveCount);
 	}
 }
