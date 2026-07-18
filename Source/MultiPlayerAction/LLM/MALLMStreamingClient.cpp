@@ -1,5 +1,6 @@
 #include "LLM/MALLMStreamingClient.h"
 
+#include "LLM/MALLMRequestBody.h"
 #include "LLM/MALLMSettings.h"
 #include "Async/Async.h"
 #include "Dom/JsonObject.h"
@@ -19,40 +20,6 @@ namespace
 	// 错误体只留头部这么多字节用于诊断，防止异常大响应吃内存。
 	constexpr int32 GMaxRawHeadBytes = 8 * 1024;
 
-	FString BuildRequestBody(const TArray<FMALLMMessage>& Messages, const UMALLMSettings& S,
-		const FMALLMStreamRequest::FOverrides& Overrides)
-	{
-		TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
-		Root->SetStringField(TEXT("model"), Overrides.Model.IsEmpty() ? S.Model : Overrides.Model);
-		Root->SetBoolField(TEXT("stream"), true);
-		// temperature 默认省缺（用模型服务端默认值）：kimi-k3 携带非 1 的值会拒绝整个请求。
-		if (Overrides.Temperature >= 0.f)
-		{
-			Root->SetNumberField(TEXT("temperature"), Overrides.Temperature);
-		}
-		else if (S.bSendTemperature)
-		{
-			Root->SetNumberField(TEXT("temperature"), S.Temperature);
-		}
-		Root->SetNumberField(TEXT("max_tokens"),
-			Overrides.MaxTokens > 0 ? Overrides.MaxTokens : S.MaxTokens);
-
-		TArray<TSharedPtr<FJsonValue>> MessageArray;
-		MessageArray.Reserve(Messages.Num());
-		for (const FMALLMMessage& Msg : Messages)
-		{
-			TSharedRef<FJsonObject> JsonMsg = MakeShared<FJsonObject>();
-			JsonMsg->SetStringField(TEXT("role"), MALLM::RoleToString(Msg.Role));
-			JsonMsg->SetStringField(TEXT("content"), Msg.Content);
-			MessageArray.Add(MakeShared<FJsonValueObject>(JsonMsg));
-		}
-		Root->SetArrayField(TEXT("messages"), MessageArray);
-
-		FString Body;
-		const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Body);
-		FJsonSerializer::Serialize(Root, Writer);
-		return Body;
-	}
 }
 
 TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> FMALLMStreamRequest::Start(
@@ -105,7 +72,20 @@ TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> FMALLMStreamRequest::Start(
 	Request->SetHeader(TEXT("Accept"), TEXT("text/event-stream"));
 	Request->SetTimeout(S->TotalTimeoutSeconds);
 	Request->SetActivityTimeout(S->ActivityTimeoutSeconds);
-	Request->SetContentAsString(BuildRequestBody(Messages, *S, Overrides));
+	FMALLMRequestParams BodyParams;
+	BodyParams.Model = Overrides.Model.IsEmpty() ? S->Model : Overrides.Model;
+	BodyParams.MaxTokens = Overrides.MaxTokens > 0 ? Overrides.MaxTokens : S->MaxTokens;
+	if (Overrides.Temperature >= 0.f)
+	{
+		BodyParams.bSendTemperature = true;
+		BodyParams.Temperature = Overrides.Temperature;
+	}
+	else if (S->bSendTemperature)
+	{
+		BodyParams.bSendTemperature = true;
+		BodyParams.Temperature = S->Temperature;
+	}
+	Request->SetContentAsString(MALLM::BuildChatRequestBody(Messages, BodyParams, TArray<FMALLMToolSpec>()));
 
 	TWeakPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> WeakSelf = Self;
 
