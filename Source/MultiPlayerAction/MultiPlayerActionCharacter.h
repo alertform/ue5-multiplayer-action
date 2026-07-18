@@ -116,6 +116,17 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_PlayDeath();
 
+	// ===== 触屏输入桥：UMATouchControlsWidget 的屏幕按钮直调（绕过输入系统，
+	// ===== 复用键鼠/手柄同一套 handler，行为完全一致）=====
+	void TouchAttack();
+	void TouchDodge();
+	void TouchFireball();
+	void TouchDashSlash();
+	void TouchBlockPressed();
+	void TouchBlockReleased();
+	void TouchSprintPressed();
+	void TouchSprintReleased();
+
 protected:
 	/** Authored-death epilogue: as the clip ends, hand the corpse to physics — the final frame
 	 *  is authored in place and can hover; ragdoll settles it onto the ground. Runs locally on

@@ -5,6 +5,7 @@
 #include "UI/MAScoreboardWidget.h"
 #include "UI/MAKillFeedWidget.h"
 #include "UI/MADialogueWidget.h"
+#include "UI/MATouchControlsWidget.h"
 #include "Dialogue/MADialogueComponent.h"
 #include "Dialogue/MADialogueSubsystem.h"
 #include "AbilitySystem/MAAttributeSet.h"
@@ -23,6 +24,25 @@
 // 对话交互的客户端侧诊断——默认静默，测试时 -LogCmds="LogMADialogueInput Verbose" 开启
 DEFINE_LOG_CATEGORY_STATIC(LogMADialogueInput, Log, All);
 
+static TAutoConsoleVariable<int32> CVarTouchControls(
+	TEXT("ma.TouchControls"), -1,
+	TEXT("-1 = auto (touch platforms only), 0 = force off, 1 = force on (PC 上鼠标点按调试)."));
+
+static bool ShouldShowTouchControls()
+{
+	switch (CVarTouchControls.GetValueOnGameThread())
+	{
+	case 0:  return false;
+	case 1:  return true;
+	default:
+#if PLATFORM_ANDROID || PLATFORM_IOS
+		return true;
+#else
+		return false;
+#endif
+	}
+}
+
 AMAPlayerController::AMAPlayerController()
 {
 	// Bind WBP_HUD asset directly here so the C++ class is self-sufficient
@@ -38,6 +58,7 @@ AMAPlayerController::AMAPlayerController()
 	MatchStatusWidgetClass = UMAMatchStatusWidget::StaticClass();
 	ScoreboardWidgetClass = UMAScoreboardWidget::StaticClass();
 	KillFeedWidgetClass = UMAKillFeedWidget::StaticClass();
+	TouchControlsWidgetClass = UMATouchControlsWidget::StaticClass();
 }
 
 void AMAPlayerController::BeginPlay()
@@ -400,6 +421,16 @@ void AMAPlayerController::EnsureHUDInitialized()
 		if (KillFeedWidget)
 		{
 			KillFeedWidget->AddToViewport(2);
+		}
+	}
+
+	// 触屏操作层：仅触屏平台（或 ma.TouchControls 1 强制）时挂载，盖在 HUD 之上。
+	if (!TouchControlsWidget && TouchControlsWidgetClass && ShouldShowTouchControls())
+	{
+		TouchControlsWidget = CreateWidget<UMATouchControlsWidget>(this, TouchControlsWidgetClass);
+		if (TouchControlsWidget)
+		{
+			TouchControlsWidget->AddToViewport(5);
 		}
 	}
 }

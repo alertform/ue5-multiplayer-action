@@ -532,6 +532,17 @@ void AMultiPlayerActionCharacter::OnInteractInput()
 	}
 }
 
+// ===== 触屏输入桥 =====
+
+void AMultiPlayerActionCharacter::TouchAttack()       { OnAttackInput(); }
+void AMultiPlayerActionCharacter::TouchDodge()        { OnDodgeInput(); }
+void AMultiPlayerActionCharacter::TouchFireball()     { OnFireballInput(); }
+void AMultiPlayerActionCharacter::TouchDashSlash()    { OnDashSlashInput(); }
+void AMultiPlayerActionCharacter::TouchBlockPressed() { OnBlockPressed(); }
+void AMultiPlayerActionCharacter::TouchBlockReleased(){ OnBlockReleased(); }
+void AMultiPlayerActionCharacter::TouchSprintPressed(){ OnSprintPressed(); }
+void AMultiPlayerActionCharacter::TouchSprintReleased(){ OnSprintReleased(); }
+
 void AMultiPlayerActionCharacter::OnScoreboardReleased()
 {
 	if (AMAPlayerController* PC = Cast<AMAPlayerController>(Controller))

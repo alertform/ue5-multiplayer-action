@@ -10,6 +10,7 @@
 #include "Components/EditableTextBox.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
+#include "Components/SafeZone.h"
 #include "Components/ScrollBox.h"
 #include "Components/ScrollBoxSlot.h"
 #include "Components/SizeBox.h"
@@ -33,8 +34,12 @@ void UMADialogueWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
+	// SafeZone 根：手机刘海/圆角屏自动内缩，对话窗不被遮。
+	USafeZone* Safe = WidgetTree->ConstructWidget<USafeZone>(USafeZone::StaticClass(), TEXT("DialogueSafeZone"));
+	WidgetTree->RootWidget = Safe;
+
 	UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("DialogueRoot"));
-	WidgetTree->RootWidget = Root;
+	Safe->AddChild(Root);
 
 	UBorder* Panel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("DialoguePanel"));
 	Panel->SetBrushColor(GDialoguePanelBg);

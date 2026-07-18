@@ -10,6 +10,7 @@ class UMAScoreboardWidget;
 class UMAKillFeedWidget;
 class UMADialogueWidget;
 class UMADialogueComponent;
+class UMATouchControlsWidget;
 
 /**
  * Owns local-player UI. Spawns the HUD widget on BeginPlay and binds it to the
@@ -55,6 +56,9 @@ public:
 
 	/** 交互输入（Character 的 IA_Interact Started 路由至此）：搜寻半径内最近 NPC，找到即开窗。 */
 	void OnInteractPressed();
+
+	/** 触屏控件用：对话打开期间战斗按钮静默忽略。 */
+	bool IsDialogueOpen() const { return bDialogueOpen; }
 
 	/** widget → PC：玩家回车提交一条消息（本地上屏 + 发给 server）。 */
 	void SubmitDialogueText(const FString& Text);
@@ -113,6 +117,13 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UMAKillFeedWidget> KillFeedWidget;
+
+	/** 触屏操作层（虚拟摇杆之外的按键动作）。显隐由 ma.TouchControls 决定。 */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UMATouchControlsWidget> TouchControlsWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UMATouchControlsWidget> TouchControlsWidget;
 
 private:
 	/** Idempotent: creates widget if not yet created, then binds to ASC if PS available. */
