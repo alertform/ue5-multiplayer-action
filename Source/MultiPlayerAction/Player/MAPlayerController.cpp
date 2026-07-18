@@ -2,6 +2,7 @@
 #include "Player/MAPlayerState.h"
 #include "UI/MAUserWidget.h"
 #include "UI/MAMatchStatusWidget.h"
+#include "UI/MAQuestTrackerWidget.h"
 #include "UI/MAScoreboardWidget.h"
 #include "UI/MAKillFeedWidget.h"
 #include "UI/MADialogueWidget.h"
@@ -404,6 +405,14 @@ void AMAPlayerController::EnsureHUDInitialized()
 		if (MatchStatusWidget)
 		{
 			MatchStatusWidget->AddToViewport(1);
+		}
+	}
+	if (!QuestTrackerWidget)
+	{
+		QuestTrackerWidget = CreateWidget<UMAQuestTrackerWidget>(this, UMAQuestTrackerWidget::StaticClass());
+		if (QuestTrackerWidget)
+		{
+			QuestTrackerWidget->AddToViewport(1);
 		}
 	}
 	if (!ScoreboardWidget && ScoreboardWidgetClass)

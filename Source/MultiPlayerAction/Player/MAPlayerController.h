@@ -104,6 +104,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UMAMatchStatusWidget> MatchStatusWidget;
 
+	/** 右侧叙事任务条（轮询 PlayerState 复制状态）。纯 C++ 类直建，无 BP。 */
+	UPROPERTY()
+	TObjectPtr<class UMAQuestTrackerWidget> QuestTrackerWidget;
+
 	/** Tab scoreboard / post-match results panel. Defaults to the C++ class. */
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UMAScoreboardWidget> ScoreboardWidgetClass;
