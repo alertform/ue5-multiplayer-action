@@ -62,4 +62,11 @@ private:
 
 	/** NPC 离场引用计数：多个玩家同一 NPC 接单时，最后一单终结才回归。 */
 	TMap<TWeakObjectPtr<AActor>, int32> QuestGiverAwayRefs;
+
+	/** 叙事节拍：离场→现身 / 清场→回归 之间的呼吸感停顿（未来特效/动画的挂点）。 */
+	static constexpr float EnemySpawnDelaySeconds = 2.5f;
+	static constexpr float GiverReturnDelaySeconds = 3.f;
+
+	/** 延迟中的刷怪定时器；任务在延迟内终结（极端：1 杀任务被 PvP 秒完成）时撤销。 */
+	TMap<TWeakObjectPtr<AMAPlayerState>, FTimerHandle> PendingSpawnTimers;
 };

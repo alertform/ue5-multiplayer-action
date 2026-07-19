@@ -9,6 +9,7 @@
 #include "GameplayEffect.h"
 #include "Narrative/MAQuestRules.h"
 #include "Player/MAPlayerController.h"
+#include "TimerManager.h"
 #include "Player/MAPlayerState.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMANarrative, Log, All);
@@ -56,13 +57,33 @@ FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
 
 	PS->SetActiveQuest(MAQuestRules::MakeActiveQuest(Params, NowServerTime()));
 	PS->IncrementQuestsIssued();
-	SpawnQuestEnemies(PS, Npc, Params.KillCount);
 
-	// 剑客离场观战，任务终结时回归（HandleQuestTerminal）。
+	// 剑客立刻离场观战，任务终结时回归（HandleQuestTerminal）。
 	if (AActor* NpcOwner = Npc ? Npc->GetOwner() : nullptr)
 	{
 		QuestGiverByPlayer.Add(PS, NpcOwner);
 		SetQuestGiverAway(NpcOwner, true);
+	}
+
+	// 离场与敌人现身之间停顿几秒 —— 叙事呼吸感；未来在此挂现身特效/预警圈。
+	{
+		TWeakObjectPtr<UMANarrativeSubsystem> WeakThis(this);
+		TWeakObjectPtr<AMAPlayerState> WeakPS(PS);
+		TWeakObjectPtr<const UMADialogueComponent> WeakNpc(Npc);
+		const int32 SpawnCount = Params.KillCount;
+		FTimerHandle& Handle = PendingSpawnTimers.FindOrAdd(PS);
+		GetWorld()->GetTimerManager().SetTimer(Handle,
+			FTimerDelegate::CreateLambda([WeakThis, WeakPS, WeakNpc, SpawnCount]()
+			{
+				UMANarrativeSubsystem* Self = WeakThis.Get();
+				AMAPlayerState* Player = WeakPS.Get();
+				if (Self && Player)
+				{
+					Self->PendingSpawnTimers.Remove(Player);
+					Self->SpawnQuestEnemies(Player, WeakNpc.Get(), SpawnCount);
+				}
+			}),
+			EnemySpawnDelaySeconds, false);
 	}
 	OutSpokenLine = Params.QuestLine;
 	UE_LOG(LogMANarrative, Display, TEXT("已发布任务：击杀 %d，限时 %d 秒（%s）"),
@@ -128,15 +149,32 @@ void UMANarrativeSubsystem::NotifyKill(AMAPlayerState* KillerPS)
 
 void UMANarrativeSubsystem::HandleQuestTerminal(AMAPlayerState* PS)
 {
+	// 撤销还没触发的延迟刷怪（延迟内任务已终结则不该再冒敌人）。
+	if (FTimerHandle* Pending = PendingSpawnTimers.Find(PS))
+	{
+		GetWorld()->GetTimerManager().ClearTimer(*Pending);
+		PendingSpawnTimers.Remove(PS);
+	}
+
 	CleanupQuestEnemies(PS); // 残余目标随任务一起谢幕（PvP 击杀也计进度，可能有剩）
 
+	// 清场之后停顿几秒剑客再归位 —— 未来在此挂回归动画/特效。
 	TWeakObjectPtr<AActor> Giver;
 	if (QuestGiverByPlayer.RemoveAndCopyValue(PS, Giver))
 	{
-		if (AActor* NpcOwner = Giver.Get())
-		{
-			SetQuestGiverAway(NpcOwner, false);
-		}
+		TWeakObjectPtr<UMANarrativeSubsystem> WeakThis(this);
+		FTimerHandle ReturnHandle;
+		GetWorld()->GetTimerManager().SetTimer(ReturnHandle,
+			FTimerDelegate::CreateLambda([WeakThis, Giver]()
+			{
+				UMANarrativeSubsystem* Self = WeakThis.Get();
+				AActor* NpcOwner = Giver.Get();
+				if (Self && NpcOwner)
+				{
+					Self->SetQuestGiverAway(NpcOwner, false);
+				}
+			}),
+			GiverReturnDelaySeconds, false);
 	}
 }
 
