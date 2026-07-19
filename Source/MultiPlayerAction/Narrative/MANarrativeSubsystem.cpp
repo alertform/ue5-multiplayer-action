@@ -57,6 +57,13 @@ FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
 	PS->SetActiveQuest(MAQuestRules::MakeActiveQuest(Params, NowServerTime()));
 	PS->IncrementQuestsIssued();
 	SpawnQuestEnemies(PS, Npc, Params.KillCount);
+
+	// 剑客离场观战，任务终结时回归（HandleQuestTerminal）。
+	if (AActor* NpcOwner = Npc ? Npc->GetOwner() : nullptr)
+	{
+		QuestGiverByPlayer.Add(PS, NpcOwner);
+		SetQuestGiverAway(NpcOwner, true);
+	}
 	OutSpokenLine = Params.QuestLine;
 	UE_LOG(LogMANarrative, Display, TEXT("已发布任务：击杀 %d，限时 %d 秒（%s）"),
 		Params.KillCount, Params.TimeLimitSeconds, *PS->GetPlayerName());
@@ -115,7 +122,39 @@ void UMANarrativeSubsystem::NotifyKill(AMAPlayerState* KillerPS)
 	if (Result == MAQuestRules::EMAQuestKillResult::JustCompleted)
 	{
 		GrantQuestReward(KillerPS);
-		CleanupQuestEnemies(KillerPS); // 残余目标随任务一起谢幕（PvP 击杀也计进度，可能有剩）
+		HandleQuestTerminal(KillerPS);
+	}
+}
+
+void UMANarrativeSubsystem::HandleQuestTerminal(AMAPlayerState* PS)
+{
+	CleanupQuestEnemies(PS); // 残余目标随任务一起谢幕（PvP 击杀也计进度，可能有剩）
+
+	TWeakObjectPtr<AActor> Giver;
+	if (QuestGiverByPlayer.RemoveAndCopyValue(PS, Giver))
+	{
+		if (AActor* NpcOwner = Giver.Get())
+		{
+			SetQuestGiverAway(NpcOwner, false);
+		}
+	}
+}
+
+void UMANarrativeSubsystem::SetQuestGiverAway(AActor* NpcOwner, bool bAway)
+{
+	int32& Refs = QuestGiverAwayRefs.FindOrAdd(NpcOwner);
+	Refs += bAway ? 1 : -1;
+	const bool bShouldHide = Refs > 0;
+	if (Refs <= 0)
+	{
+		QuestGiverAwayRefs.Remove(NpcOwner);
+	}
+	if (NpcOwner->IsHidden() != bShouldHide)
+	{
+		NpcOwner->SetActorHiddenInGame(bShouldHide);
+		NpcOwner->SetActorEnableCollision(!bShouldHide);
+		UE_LOG(LogMANarrative, Display, TEXT("任务发布者%s：%s"),
+			bShouldHide ? TEXT("离场") : TEXT("回归"), *NpcOwner->GetName());
 	}
 }
 
@@ -184,7 +223,7 @@ void UMANarrativeSubsystem::Tick(float DeltaTime)
 			{
 				if (MAQuestRules::CheckExpired(MPS->GetMutableActiveQuest(), NowServerTime()))
 				{
-					CleanupQuestEnemies(MPS); // 超时任务的目标一并清场
+					HandleQuestTerminal(MPS); // 超时：清场 + 剑客回归
 				}
 			}
 		}

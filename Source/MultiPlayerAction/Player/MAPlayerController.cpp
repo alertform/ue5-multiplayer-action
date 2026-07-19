@@ -151,6 +151,11 @@ UMADialogueComponent* AMAPlayerController::FindNearbyDialogueNpc() const
 		{
 			continue;
 		}
+		// 任务进行中 NPC 离场（server 隐身，bHidden 已复制）——不可交互。
+		if (Comp->GetOwner()->IsHidden())
+		{
+			continue;
+		}
 		const float DistSq = FVector::DistSquared(
 			MyPawn->GetActorLocation(), Comp->GetOwner()->GetActorLocation());
 		UE_LOG(LogMADialogueInput, Verbose, TEXT("candidate %s dist=%.0f radius=%.0f"),

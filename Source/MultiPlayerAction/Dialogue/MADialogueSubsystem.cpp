@@ -34,6 +34,12 @@ void UMADialogueSubsystem::StartSession(AMAPlayerController* PC, UMADialogueComp
 		return;
 	}
 
+	// 任务进行中 NPC 离场 —— 恶意客户端跳过本地隐身检查也在这里被拦。
+	if (Npc->GetOwner()->IsHidden())
+	{
+		return;
+	}
+
 	// 服务器权威距离验证（客户端半径判定不可信）。
 	const APawn* Pawn = PC->GetPawn();
 	if (!Pawn)

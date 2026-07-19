@@ -47,9 +47,19 @@ private:
 	void SpawnQuestEnemies(AMAPlayerState* PS, const UMADialogueComponent* Npc, int32 Count);
 	/** 任务终结（完成/超时）时清掉该玩家残余的任务刷怪 —— 竞技场无任务时保持空场。 */
 	void CleanupQuestEnemies(AMAPlayerState* PS);
+	/** 任务终结统一入口：清残余刷怪 + 让离场的任务发布者回归。 */
+	void HandleQuestTerminal(AMAPlayerState* PS);
+	/** 接单后 NPC 离场（隐身+关碰撞），bHidden 复制到客户端；引用计数防多玩家任务互踩。 */
+	void SetQuestGiverAway(AActor* NpcOwner, bool bAway);
 	double NowServerTime() const;
 	float ExpirySweepAccum = 0.f;
 
 	/** 每玩家在场的任务刷怪（弱引用；被杀的自然失效）。 */
 	TMap<TWeakObjectPtr<AMAPlayerState>, TArray<TWeakObjectPtr<ACharacter>>> QuestSpawnedEnemies;
+
+	/** 每玩家进行中任务的发布者（终结时据此让 NPC 回归）。 */
+	TMap<TWeakObjectPtr<AMAPlayerState>, TWeakObjectPtr<AActor>> QuestGiverByPlayer;
+
+	/** NPC 离场引用计数：多个玩家同一 NPC 接单时，最后一单终结才回归。 */
+	TMap<TWeakObjectPtr<AActor>, int32> QuestGiverAwayRefs;
 };
