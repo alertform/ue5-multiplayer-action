@@ -1,6 +1,7 @@
 #include "UI/MADialogueWidget.h"
 
 #include "Player/MAPlayerController.h"
+#include "Player/MAPlayerState.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
@@ -110,6 +111,30 @@ void UMADialogueWidget::NativeOnInitialized()
 	InputBox->SetClearKeyboardFocusOnCommit(false);
 	InputBox->OnTextCommitted.AddDynamic(this, &UMADialogueWidget::OnInputCommitted);
 	Stack->AddChildToVerticalBox(InputBox);
+
+	// --- 接任务按钮：任务入口独立成键，输入框回归自由聊天 ---
+	QuestButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("DialogueQuest"));
+	QuestButton->SetBackgroundColor(FLinearColor(1.0f, 0.78f, 0.35f, 0.85f)); // HUD amber
+	QuestButton->OnClicked.AddDynamic(this, &UMADialogueWidget::OnQuestClicked);
+	QuestButtonText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	QuestButtonText->SetFont(FSlateFontInfo(FCoreStyle::GetDefaultFontStyle("Bold", 13)));
+	QuestButtonText->SetColorAndOpacity(FSlateColor(FLinearColor(0.08f, 0.06f, 0.02f, 1.f)));
+	QuestButtonText->SetText(FText::FromString(TEXT("接任务")));
+	QuestButton->AddChild(QuestButtonText);
+	if (UVerticalBoxSlot* QuestSlot = Stack->AddChildToVerticalBox(QuestButton))
+	{
+		QuestSlot->SetPadding(FMargin(0.f, 6.f, 0.f, 0.f));
+		QuestSlot->SetHorizontalAlignment(HAlign_Fill);
+	}
+}
+
+void UMADialogueWidget::OnQuestClicked()
+{
+	if (AMAPlayerController* PC = GetOwningPlayer<AMAPlayerController>())
+	{
+		// 替玩家开口 —— 与手打消息完全同路（上屏、等待态、Server RPC、LLM 工具调用）。
+		PC->SubmitDialogueText(TEXT("（抱拳）前辈，请赐我一个任务。"));
+	}
 }
 
 void UMADialogueWidget::OpenFor(const FString& NpcName, const FString& Greeting)
@@ -147,6 +172,25 @@ void UMADialogueWidget::SetWaitingStatus()
 void UMADialogueWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	// 接任务按钮状态：等回复或已有进行中任务时置灰（任务状态已复制，客户端可读）。
+	if (QuestButton)
+	{
+		bool bQuestActive = false;
+		if (const APlayerController* PC = GetOwningPlayer())
+		{
+			if (const AMAPlayerState* PS = PC->GetPlayerState<AMAPlayerState>())
+			{
+				bQuestActive = PS->GetActiveQuest().Phase == EMAQuestPhase::Active;
+			}
+		}
+		QuestButton->SetIsEnabled(!bWaitingForReply && !bQuestActive);
+		if (QuestButtonText)
+		{
+			QuestButtonText->SetText(FText::FromString(
+				bQuestActive ? TEXT("任务进行中…") : TEXT("接任务")));
+		}
+	}
 
 	if (!bWaitingForReply)
 	{

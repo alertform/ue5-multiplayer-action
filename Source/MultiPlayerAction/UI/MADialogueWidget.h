@@ -62,6 +62,14 @@ private:
 	UPROPERTY()
 	TObjectPtr<UButton> CloseButton;
 
+	/** 一键接任务：等价于替玩家说一句求任务话术，走同一条 LLM+校验管线。
+	 *  已有进行中任务或等回复时置灰。 */
+	UPROPERTY()
+	TObjectPtr<UButton> QuestButton;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> QuestButtonText;
+
 	/** 正在流式追加的 NPC 行；nullptr = 无进行中回复。 */
 	UPROPERTY()
 	TObjectPtr<UTextBlock> CurrentNpcLine;
@@ -78,6 +86,9 @@ private:
 
 	UFUNCTION()
 	void OnCloseClicked();
+
+	UFUNCTION()
+	void OnQuestClicked();
 
 	UTextBlock* MakeLine(const FLinearColor& Color, int32 FontSize);
 	void ScrollToEnd();
