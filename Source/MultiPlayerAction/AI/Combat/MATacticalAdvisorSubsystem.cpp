@@ -123,9 +123,9 @@ void UMATacticalAdvisorSubsystem::Tick(float DeltaTime)
 	};
 
 	FMALLMStreamRequest::FOverrides Overrides;
-	// 决策 JSON 本身很小，但思考型模型（kimi-k3）会先烧内部推理预算 ——
-	// 给足空间，实际输出仍只有几十 token。
-	Overrides.MaxTokens = 1024;
+	// 决策 JSON 本身很小，但思考型模型会先烧内部推理预算 —— k2.6 实测偶发
+	// 超 1024（finish=length 正文空），给到 2048，实际输出仍只有几十 token。
+	Overrides.MaxTokens = 2048;
 
 	FString StartError;
 	ActiveRequest = FMALLMStreamRequest::Start(Messages, MoveTemp(Callbacks), StartError, Overrides);
