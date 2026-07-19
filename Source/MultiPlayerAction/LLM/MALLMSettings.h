@@ -30,6 +30,14 @@ public:
 	FString ApiKeyEnvVar = TEXT("MOONSHOT_API_KEY");
 
 	/**
+	 * 关闭思维链（kimi-k2.6 实测支持 thinking.type=disabled）：NPC 秒回、
+	 * 推理 token 从 200+ 降到 ~0、台词与工具调用同轮输出。
+	 * 关掉此开关可换回思考模式（任务参数可能更讲究，但首字延迟 10s+）。
+	 */
+	UPROPERTY(EditAnywhere, Config, Category = "Sampling")
+	bool bDisableThinking = true;
+
+	/**
 	 * 是否随请求发送 temperature。默认关：部分模型（如 kimi-k3）只接受服务端默认值，
 	 * 携带其他值会整个请求被拒（"invalid temperature: only 1 is allowed"）。
 	 */

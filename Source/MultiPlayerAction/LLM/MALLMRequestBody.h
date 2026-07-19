@@ -8,6 +8,8 @@ struct FMALLMRequestParams
 {
 	FString Model;
 	int32 MaxTokens = 512;
+	/** 写 thinking.type=disabled 关闭思维链（k2.6 实测：省 200+ 推理 token 且秒回）。 */
+	bool bDisableThinking = false;
 	/** kimi 全系只接受服务端默认 temperature，默认省缺该字段。 */
 	bool bSendTemperature = false;
 	float Temperature = 1.f;

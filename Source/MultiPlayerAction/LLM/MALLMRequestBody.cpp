@@ -17,6 +17,12 @@ FString MALLM::BuildChatRequestBody(const TArray<FMALLMMessage>& Messages,
 	{
 		Root->SetNumberField(TEXT("temperature"), Params.Temperature);
 	}
+	if (Params.bDisableThinking)
+	{
+		TSharedRef<FJsonObject> Thinking = MakeShared<FJsonObject>();
+		Thinking->SetStringField(TEXT("type"), TEXT("disabled"));
+		Root->SetObjectField(TEXT("thinking"), Thinking);
+	}
 	Root->SetNumberField(TEXT("max_tokens"), Params.MaxTokens);
 
 	TArray<TSharedPtr<FJsonValue>> MessageArray;

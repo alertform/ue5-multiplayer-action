@@ -75,6 +75,7 @@ TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> FMALLMStreamRequest::Start(
 	FMALLMRequestParams BodyParams;
 	BodyParams.Model = Overrides.Model.IsEmpty() ? S->Model : Overrides.Model;
 	BodyParams.MaxTokens = Overrides.MaxTokens > 0 ? Overrides.MaxTokens : S->MaxTokens;
+	BodyParams.bDisableThinking = S->bDisableThinking;
 	if (Overrides.Temperature >= 0.f)
 	{
 		BodyParams.bSendTemperature = true;

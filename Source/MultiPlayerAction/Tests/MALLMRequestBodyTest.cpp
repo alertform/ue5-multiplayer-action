@@ -46,6 +46,21 @@ bool FMALLMRequestBodyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("temperature present when opted in"), Body2->HasField(TEXT("temperature")));
 	}
 
+	// 1b) thinking 开关：开 bDisableThinking 时写 {"type":"disabled"}；默认不写该字段。
+	{
+		TArray<FMALLMMessage> Msgs = { FMALLMMessage(EMALLMRole::User, TEXT("hi")) };
+		FMALLMRequestParams NoThink = Params;
+		NoThink.bDisableThinking = true;
+		TSharedPtr<FJsonObject> Body = MARequestBodyTest_Parse(MALLM::BuildChatRequestBody(Msgs, NoThink, {}));
+		if (TestTrue(TEXT("thinking field present"), Body->HasField(TEXT("thinking"))))
+		{
+			TestEqual(TEXT("thinking disabled"),
+				Body->GetObjectField(TEXT("thinking"))->GetStringField(TEXT("type")), TEXT("disabled"));
+		}
+		TSharedPtr<FJsonObject> Body2 = MARequestBodyTest_Parse(MALLM::BuildChatRequestBody(Msgs, Params, {}));
+		TestFalse(TEXT("no thinking field by default"), Body2->HasField(TEXT("thinking")));
+	}
+
 	// 2) tools 数组：schema 字符串必须注入为 JSON 对象而非字符串。
 	{
 		FMALLMToolSpec Spec;
