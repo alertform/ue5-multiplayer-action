@@ -59,6 +59,16 @@ private:
 		/** 窗口已关但请求仍在飞行：让工具调用（发任务）执行完，完成后再销毁会话。
 		 *  没有这个标记时，关窗=取消请求=玩家"以为接到了任务"（实测两次踩坑）。 */
 		bool bWindowClosed = false;
+
+		// ---- 回声剔除：k2.6 偶发在正文开头原样复述玩家的话（prompt 禁令压不净）----
+		/** 本轮玩家消息原文（回声比对基准）。 */
+		FString LastPlayerMessage;
+		/** 回声判定是否已出结果；未出结果前增量被扣着不发。 */
+		bool bEchoResolved = false;
+		/** 判定为回声时，正文开头要跳过的字符数。 */
+		int32 EchoSkipChars = 0;
+		/** 剥掉回声后吃掉紧随的空白/换行，见到实字符即停。 */
+		bool bStripLeadingWs = false;
 	};
 
 	TMap<TWeakObjectPtr<AMAPlayerController>, FSession> Sessions;

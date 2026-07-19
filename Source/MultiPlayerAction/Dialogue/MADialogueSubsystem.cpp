@@ -96,6 +96,12 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 	// 上一条还在生成 → 打断，已流出的部分保进历史。
 	InterruptActiveRequest(*Session);
 
+	// 回声剔除基准：本轮玩家原文（Clean 马上要被 MoveTemp，先拷）。
+	Session->LastPlayerMessage = Clean;
+	Session->bEchoResolved = false;
+	Session->EchoSkipChars = 0;
+	Session->bStripLeadingWs = false;
+
 	Session->History.Emplace(EMALLMRole::User, MoveTemp(Clean));
 	TrimHistory(*Session);
 
@@ -136,8 +142,48 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 		}
 		if (FSession* S = Self->FindSession(Controller); S && S->MessageId == Id)
 		{
-			S->PendingDeltas += Delta;
 			S->StreamedSoFar += Delta;
+
+			// 回声剔除：正文开头若原样复述玩家的话，扣住不发、判定后跳过。
+			FString ToShow;
+			if (S->bEchoResolved)
+			{
+				ToShow = Delta;
+			}
+			else if (S->StreamedSoFar.Len() <= S->LastPlayerMessage.Len())
+			{
+				if (S->LastPlayerMessage.StartsWith(S->StreamedSoFar))
+				{
+					return; // 仍是玩家原话的前缀，悬而未决 —— 扣住
+				}
+				S->bEchoResolved = true; // 提前分叉 = 不是回声，把扣住的全放出
+				ToShow = S->StreamedSoFar;
+			}
+			else
+			{
+				S->bEchoResolved = true;
+				if (S->StreamedSoFar.StartsWith(S->LastPlayerMessage))
+				{
+					S->EchoSkipChars = S->LastPlayerMessage.Len();
+					S->bStripLeadingWs = true; // 回声后常跟换行/空格，一并吃掉
+				}
+				ToShow = S->StreamedSoFar.Mid(S->EchoSkipChars);
+			}
+			if (S->bStripLeadingWs)
+			{
+				int32 Cut = 0;
+				while (Cut < ToShow.Len() && FChar::IsWhitespace(ToShow[Cut]))
+				{
+					++Cut;
+				}
+				if (Cut < ToShow.Len())
+				{
+					S->bStripLeadingWs = false;
+				}
+				ToShow.RightChopInline(Cut);
+			}
+
+			S->PendingDeltas += ToShow;
 			if (S->PendingDeltas.Len() >= GFlushImmediatelyAt)
 			{
 				Self->FlushDeltas(Controller, *S);
@@ -185,9 +231,11 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 			}
 		}
 
-		// 工具调用轮 content 为空（k2.6 实测）—— 用 quest_line 当台词整段推给客户端，
-		// 并补进历史，下一轮模型才知道自己说过这句话。
-		if (FullText.IsEmpty() && !SpokenFallback.IsEmpty())
+		// 工具调用轮玩家实际看到的正文可能为空（content 本来为空，或整段都是被剔除的
+		// 回声）—— 用 quest_line 当台词整段推给客户端，并补进历史。
+		const bool bNothingShown = !S->bEchoResolved
+			|| FullText.Mid(S->EchoSkipChars).TrimStartAndEnd().IsEmpty();
+		if (bNothingShown && !SpokenFallback.IsEmpty())
 		{
 			S->PendingDeltas += SpokenFallback;
 			Self->FlushDeltas(Controller, *S);
