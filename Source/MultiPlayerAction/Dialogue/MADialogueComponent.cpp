@@ -5,12 +5,20 @@
 #include "NiagaraSystem.h"
 #include "UI/MANpcNameplateWidget.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogMADialogueFX, Log, All);
+
+UMADialogueComponent::UMADialogueComponent()
+{
+	// tick 只为轮询绑定 GameState 特效委托（绑上即停）。
+	// bCanEverTick 必须在构造期设 —— tick 函数在 RegisterComponent 时注册，
+	// BeginPlay 里再设为时已晚（实测特效全哑的根因）。
+	PrimaryComponentTick.bCanEverTick = true;
+}
+
 void UMADialogueComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 特效分发需要 GameState 委托，晚到就轮询（绑上即停 tick）。
-	PrimaryComponentTick.bCanEverTick = true;
 	SetComponentTickEnabled(true);
 
 	AActor* Owner = GetOwner();
@@ -69,8 +77,11 @@ void UMADialogueComponent::HandleNarrativeFX(EMANarrativeFX Type, const TArray<F
 	}
 	if (!System)
 	{
+		UE_LOG(LogMADialogueFX, Log, TEXT("叙事特效跳过（type=%d 未配置资产）"), static_cast<int32>(Type));
 		return; // 未配置 = 该节拍静默
 	}
+	UE_LOG(LogMADialogueFX, Display, TEXT("叙事特效播放：type=%d %s × %d 落点"),
+		static_cast<int32>(Type), *System->GetName(), Locations.Num());
 	for (const FVector& Location : Locations)
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, System, Location);

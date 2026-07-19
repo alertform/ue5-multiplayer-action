@@ -23,6 +23,8 @@ class MULTIPLAYERACTION_API UMADialogueComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	UMADialogueComponent();
+
 	/** 对话窗标题 & system prompt 中的 {NpcName}。 */
 	UPROPERTY(EditAnywhere, Category = "Dialogue")
 	FString NpcName = TEXT("云游剑客");
