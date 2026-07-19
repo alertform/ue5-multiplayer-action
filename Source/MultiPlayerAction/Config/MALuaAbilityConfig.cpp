@@ -7,7 +7,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogMALuaConfig, Log, All);
 
 FString UMALuaAbilityConfig::DefaultConfigPath()
 {
-	return FPaths::ProjectContentDir() / TEXT("Lua") / TEXT("AbilityConfig.lua");
+	// 与 UnLua 同层的 Content/Script —— 所有 lua 一个目录，打包 staging 也共用同一条目。
+	return FPaths::ProjectContentDir() / TEXT("Script") / TEXT("AbilityConfig.lua");
 }
 
 void UMALuaAbilityConfig::Initialize(FSubsystemCollectionBase& Collection)
@@ -18,7 +19,7 @@ void UMALuaAbilityConfig::Initialize(FSubsystemCollectionBase& Collection)
 
 	ReloadCmd = IConsoleManager::Get().RegisterConsoleCommand(
 		TEXT("MA.Lua.ReloadAbilityConfig"),
-		TEXT("Reload Content/Lua/AbilityConfig.lua into the ability config cache."),
+		TEXT("Reload Content/Script/AbilityConfig.lua into the ability config cache."),
 		FConsoleCommandDelegate::CreateWeakLambda(this, [this]() { Reload(); }),
 		ECVF_Default);
 }

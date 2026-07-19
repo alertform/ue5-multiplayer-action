@@ -28,7 +28,7 @@ public:
 	/** 测试缝：直接从 Lua 源字符串灌缓存（跳过文件 IO）。 */
 	bool LoadFromString(const FString& LuaSource);
 
-	/** ProjectContentDir()/Lua/AbilityConfig.lua */
+	/** ProjectContentDir()/Script/AbilityConfig.lua（与 UnLua 脚本同层）。 */
 	static FString DefaultConfigPath();
 
 	DECLARE_MULTICAST_DELEGATE(FOnConfigReloaded);
