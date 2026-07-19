@@ -44,6 +44,7 @@ public:
 
 protected:
 	virtual void NativeOnInitialized() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
 	UPROPERTY()
@@ -67,6 +68,10 @@ private:
 
 	/** CurrentNpcLine 的累计文本（TextBlock 无 append 接口）。 */
 	FString CurrentNpcText;
+
+	/** 等待首个增量期间做省略号动画 —— 思考型模型可能十几秒无输出，静态提示会被当成卡死。 */
+	bool bWaitingForReply = false;
+	float WaitingAnimAccum = 0.f;
 
 	UFUNCTION()
 	void OnInputCommitted(const FText& Text, ETextCommit::Type CommitMethod);

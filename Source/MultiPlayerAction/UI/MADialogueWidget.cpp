@@ -118,6 +118,7 @@ void UMADialogueWidget::OpenFor(const FString& NpcName, const FString& Greeting)
 	HistoryBox->ClearChildren();
 	CurrentNpcLine = nullptr;
 	CurrentNpcText.Reset();
+	bWaitingForReply = false;
 	StatusText->SetText(FText::GetEmpty());
 	InputBox->SetText(FText::GetEmpty());
 
@@ -138,11 +139,38 @@ void UMADialogueWidget::AppendPlayerLine(const FString& Text)
 
 void UMADialogueWidget::SetWaitingStatus()
 {
-	StatusText->SetText(FText::FromString(TEXT("对方正在输入……")));
+	bWaitingForReply = true;
+	WaitingAnimAccum = 0.f;
+	StatusText->SetText(FText::FromString(TEXT("对方正在思考·")));
+}
+
+void UMADialogueWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	if (!bWaitingForReply)
+	{
+		return;
+	}
+	WaitingAnimAccum += InDeltaTime;
+	// 0.5s 一拍的省略号循环；超过 5 秒补一句解释，防止被当成卡死关窗（发任务轮
+	// 台词要等完整回复才上屏，实测可能 10 秒+）。
+	const int32 Dots = 1 + (static_cast<int32>(WaitingAnimAccum * 2.f) % 3);
+	FString Status = TEXT("对方正在思考");
+	for (int32 i = 0; i < Dots; ++i)
+	{
+		Status += TEXT("·");
+	}
+	if (WaitingAnimAccum > 5.f)
+	{
+		Status += TEXT("（在想大事，可能要十几秒）");
+	}
+	StatusText->SetText(FText::FromString(Status));
 }
 
 void UMADialogueWidget::AppendNpcDelta(const FString& Delta)
 {
+	bWaitingForReply = false;
 	if (!CurrentNpcLine)
 	{
 		CurrentNpcLine = MakeLine(GDialogueNpcText, 14);
@@ -157,6 +185,7 @@ void UMADialogueWidget::FinishNpcLine()
 {
 	CurrentNpcLine = nullptr;
 	CurrentNpcText.Reset();
+	bWaitingForReply = false;
 	StatusText->SetText(FText::GetEmpty());
 }
 
