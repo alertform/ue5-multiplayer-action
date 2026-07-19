@@ -1,5 +1,6 @@
 #include "Player/MAPlayerController.h"
 #include "Player/MAPlayerState.h"
+#include "Narrative/MAQuestRules.h"
 #include "UI/MAUserWidget.h"
 #include "UI/MAMatchStatusWidget.h"
 #include "UI/MAQuestTrackerWidget.h"
@@ -112,9 +113,15 @@ void AMAPlayerController::OnInteractPressed()
 		DialogueWidget->AddToViewport(20);
 	}
 
-	// 本地立即开窗、上开场白 —— 不等 server 往返。
+	// 本地立即开窗、上开场白 —— 不等 server 往返。任务状态已复制到本端，
+	// 开场白按状态本地计算（与服务器 StartSession 写进历史的完全一致）。
+	FString Greeting = Npc->Greeting;
+	if (const AMAPlayerState* PS = GetPlayerState<AMAPlayerState>())
+	{
+		Greeting = MAQuestRules::MakeReturnGreeting(PS->GetActiveQuest(), Npc->Greeting);
+	}
 	DialogueWidget->SetVisibility(ESlateVisibility::Visible);
-	DialogueWidget->OpenFor(Npc->NpcName, Npc->Greeting);
+	DialogueWidget->OpenFor(Npc->NpcName, Greeting);
 	bDialogueOpen = true;
 	ClientDialogueMessageId = INDEX_NONE;
 

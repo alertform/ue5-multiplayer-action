@@ -83,6 +83,22 @@ bool FMAQuestRulesTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("completed quest allows new one"), MAQuestRules::ParseAndValidateGiveQuest(
 		TEXT("{\"kill_count\":3,\"time_limit_seconds\":0,\"quest_line\":\"x\"}"), Quest, 1, Out, Reject));
 
+	// 重开对话的状态感知开场白：无任务=默认词；其余各态给不同的词且都非默认。
+	{
+		const FString DefaultGreeting = TEXT("站住，旅人。");
+		TestEqual(TEXT("no quest -> default greeting"),
+			MAQuestRules::MakeReturnGreeting(NoQuest, DefaultGreeting), DefaultGreeting);
+
+		const FString ActiveGreeting = MAQuestRules::MakeReturnGreeting(Active, DefaultGreeting);
+		TestNotEqual(TEXT("active quest greeting differs"), ActiveGreeting, DefaultGreeting);
+		TestTrue(TEXT("active greeting mentions progress"), ActiveGreeting.Contains(TEXT("3")));
+
+		TestNotEqual(TEXT("completed greeting differs"),
+			MAQuestRules::MakeReturnGreeting(Quest, DefaultGreeting), DefaultGreeting);
+		TestNotEqual(TEXT("failed greeting differs"),
+			MAQuestRules::MakeReturnGreeting(Expiring, DefaultGreeting), DefaultGreeting);
+	}
+
 	return true;
 }
 

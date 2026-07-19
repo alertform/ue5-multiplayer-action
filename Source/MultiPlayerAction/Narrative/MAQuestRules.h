@@ -30,4 +30,11 @@ namespace MAQuestRules
 
 	/** 限时任务过期检测；首次过期置 Failed 并返回 true（调用方触发一次性反馈）。 */
 	MULTIPLAYERACTION_API bool CheckExpired(FMAQuestState& Quest, double NowServerTime);
+
+	/**
+	 * 重开对话时的状态感知开场白（固定台词，零 LLM 成本）。
+	 * 任务状态已复制，客户端展示与服务器历史用同一函数计算 —— 两端必然一致。
+	 * 无任务返回 DefaultGreeting 原样。
+	 */
+	MULTIPLAYERACTION_API FString MakeReturnGreeting(const FMAQuestState& Quest, const FString& DefaultGreeting);
 }

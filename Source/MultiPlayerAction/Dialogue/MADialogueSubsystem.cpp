@@ -4,7 +4,9 @@
 #include "LLM/MALLMSettings.h"
 #include "LLM/MALLMStreamingClient.h"
 #include "Narrative/MANarrativeSubsystem.h"
+#include "Narrative/MAQuestRules.h"
 #include "Player/MAPlayerController.h"
+#include "Player/MAPlayerState.h"
 #include "GameFramework/Pawn.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMADialogue, Log, All);
@@ -52,8 +54,14 @@ void UMADialogueSubsystem::StartSession(AMAPlayerController* PC, UMADialogueComp
 	Session.Npc = Npc;
 	Session.History.Reset();
 	Session.History.Emplace(EMALLMRole::System, BuildSystemPrompt(*Npc));
-	// 开场白是 NPC 的固定台词，也要进上下文 —— 否则模型不知道自己刚说过什么。
-	Session.History.Emplace(EMALLMRole::Assistant, Npc->Greeting);
+	// 开场白是固定台词，也要进上下文 —— 否则模型不知道自己刚说过什么。
+	// 按任务状态选词，与客户端 OpenFor 展示的那句一致（同一纯函数计算）。
+	FString Greeting = Npc->Greeting;
+	if (AMAPlayerState* PS = PC->GetPlayerState<AMAPlayerState>())
+	{
+		Greeting = MAQuestRules::MakeReturnGreeting(PS->GetActiveQuest(), Npc->Greeting);
+	}
+	Session.History.Emplace(EMALLMRole::Assistant, MoveTemp(Greeting));
 	Session.PendingDeltas.Reset();
 	Session.StreamedSoFar.Reset();
 

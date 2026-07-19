@@ -75,6 +75,22 @@ MAQuestRules::EMAQuestKillResult MAQuestRules::ApplyKill(FMAQuestState& Quest, d
 	return EMAQuestKillResult::Progressed;
 }
 
+FString MAQuestRules::MakeReturnGreeting(const FMAQuestState& Quest, const FString& DefaultGreeting)
+{
+	switch (Quest.Phase)
+	{
+	case EMAQuestPhase::Active:
+		return FString::Printf(TEXT("任务还没了结就回来了？手上的事先办完 —— 还差 %d 个。"),
+			FMath::Max(0, Quest.TargetKills - Quest.Progress));
+	case EMAQuestPhase::Completed:
+		return TEXT("回来了？办得干净利落，赏赐已经落在你身上了。还想再接一单就开口。");
+	case EMAQuestPhase::Failed:
+		return TEXT("……上次的事砸了。江湖路远，败一次不算什么，想再试就说。");
+	default:
+		return DefaultGreeting;
+	}
+}
+
 bool MAQuestRules::CheckExpired(FMAQuestState& Quest, double NowServerTime)
 {
 	if (Quest.Phase != EMAQuestPhase::Active || Quest.DeadlineServerTime <= 0.f)
