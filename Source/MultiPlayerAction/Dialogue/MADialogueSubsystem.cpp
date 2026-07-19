@@ -108,7 +108,10 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 		{
 			SystemPrompt += Narrative->BuildNarrativeContext(PC);
 			SystemPrompt += TEXT("答应给玩家任务/敌袭/赐福时必须调用对应工具正式执行，不得只在口头承诺；"
-				"根据对话表现随时用 adjust_favor 调整好感。");
+				"根据对话表现随时用 adjust_favor 调整好感。"
+				"输出铁律：回复正文只能是你以角色身份对玩家说出的台词本身——"
+				"严禁出现思考过程、计划、数值斟酌、对工具调用的解释、自我检查，"
+				"也不要复述玩家刚说的话。要做的事直接调工具，台词只说给玩家听的那句。");
 		}
 		Session->History[0].Content = MoveTemp(SystemPrompt);
 	}
