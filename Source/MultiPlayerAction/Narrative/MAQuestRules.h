@@ -10,7 +10,9 @@
  */
 namespace MAQuestRules
 {
-	inline constexpr int32 MaxQuestsPerMatch = 3;
+	/** 剧情模式（对局不重启）下形同不限；真正的节流是单任务门槛 + NPC 自己的分寸。
+	 *  若切回 PvP 竞技模式（限时对局），收紧回个位数。 */
+	inline constexpr int32 MaxQuestsPerMatch = 99;
 	inline constexpr int32 KillCountMin = 1;
 	inline constexpr int32 KillCountMax = 10;
 	inline constexpr int32 TimeLimitMin = 60;

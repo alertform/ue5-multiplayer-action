@@ -113,21 +113,35 @@ void UMAMatchStatusWidget::NativeTick(const FGeometry& MyGeometry, float InDelta
 		if (State == MatchState::WaitingPostMatch)
 		{
 			ClockText->SetText(FText::FromString(TEXT("MATCH OVER")));
+			ClockText->SetVisibility(ESlateVisibility::HitTestInvisible);
 		}
 		else if (State == MatchState::InProgress && GS->MatchEndServerTime > 0.f)
 		{
 			const int32 Remaining = FMath::Max(0, FMath::CeilToInt(GS->MatchEndServerTime - ServerNow));
 			ClockText->SetText(FText::FromString(FString::Printf(TEXT("%02d:%02d"), Remaining / 60, Remaining % 60)));
+			ClockText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		else
+		{
+			// 剧情模式（不限时）：没有对局钟就不显示 —— 数据驱动，PvP 配回时限即恢复。
+			ClockText->SetVisibility(ESlateVisibility::Collapsed);
 		}
 	}
 
 	if (ScoreText)
 	{
 		const APlayerController* PC = GetOwningPlayer();
-		if (const AMAPlayerState* PS = PC ? PC->GetPlayerState<AMAPlayerState>() : nullptr)
+		const AMAPlayerState* PS = PC ? PC->GetPlayerState<AMAPlayerState>() : nullptr;
+		// 剧情模式（无杀数目标）：K/D 读数收起，击杀反馈由任务条/击杀 feed 承担。
+		if (PS && GS->KillTarget > 0)
 		{
 			ScoreText->SetText(FText::FromString(FString::Printf(
 				TEXT("K %d / %d    D %d"), PS->GetKills(), GS->KillTarget, PS->GetDeaths())));
+			ScoreText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		else
+		{
+			ScoreText->SetVisibility(ESlateVisibility::Collapsed);
 		}
 	}
 

@@ -32,13 +32,13 @@ protected:
 	virtual bool ReadyToEndMatch_Implementation() override;
 	virtual void HandleMatchHasEnded() override;
 
-	/** Match clock length, seconds. EditAnywhere: tunable per-level via WorldSettings override. */
+	/** Match clock length, seconds; <=0 = 不限时（剧情模式默认）。EditAnywhere: per-level tunable. */
 	UPROPERTY(EditAnywhere, Category = "Match")
-	float MatchDuration = 300.f;
+	float MatchDuration = 0.f;
 
-	/** Kills that end the match early. */
+	/** Kills that end the match early; <=0 = 不以杀数终结（剧情模式默认）。 */
 	UPROPERTY(EditAnywhere, Category = "Match")
-	int32 KillTarget = 10;
+	int32 KillTarget = 0;
 
 	/** Post-match results screen duration before the map restarts. */
 	UPROPERTY(EditAnywhere, Category = "Match")

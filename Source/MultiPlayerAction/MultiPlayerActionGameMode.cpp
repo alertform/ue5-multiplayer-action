@@ -48,7 +48,11 @@ void AMultiPlayerActionGameMode::HandleMatchHasStarted()
 
 	if (AMAGameState* GS = GetGameState<AMAGameState>())
 	{
-		GS->MatchEndServerTime = GS->GetServerWorldTimeSeconds() + MatchDuration;
+		// <=0 = 剧情模式不限时：MatchEndServerTime 保持 -1，HUD 时钟隐藏、末段锁定不触发。
+		if (MatchDuration > 0.f)
+		{
+			GS->MatchEndServerTime = GS->GetServerWorldTimeSeconds() + MatchDuration;
+		}
 	}
 }
 
@@ -117,13 +121,16 @@ bool AMultiPlayerActionGameMode::ReadyToEndMatch_Implementation()
 		return true;
 	}
 
-	// Kill target reached?
-	for (APlayerState* PS : GS->PlayerArray)
+	// Kill target reached? (<=0 = 剧情模式不以杀数终结)
+	if (KillTarget > 0)
 	{
-		const AMAPlayerState* MPS = Cast<AMAPlayerState>(PS);
-		if (MPS && MPS->GetKills() >= KillTarget)
+		for (APlayerState* PS : GS->PlayerArray)
 		{
-			return true;
+			const AMAPlayerState* MPS = Cast<AMAPlayerState>(PS);
+			if (MPS && MPS->GetKills() >= KillTarget)
+			{
+				return true;
+			}
 		}
 	}
 	return false;
