@@ -98,6 +98,9 @@ void AMAPlayerController::SetupInputComponent()
 	// J/Esc 会落进输入框而非此绑定，天然互斥）。
 	InputComponent->BindKey(EKeys::J, IE_Pressed, this, &AMAPlayerController::ToggleQuestJournal);
 	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AMAPlayerController::ToggleEscMenu);
+	// 手柄：Menu(Start)=ESC 菜单，View(Select)=任务日志。
+	InputComponent->BindKey(EKeys::Gamepad_Special_Right, IE_Pressed, this, &AMAPlayerController::ToggleEscMenu);
+	InputComponent->BindKey(EKeys::Gamepad_Special_Left, IE_Pressed, this, &AMAPlayerController::ToggleQuestJournal);
 }
 
 void AMAPlayerController::ToggleEscMenu()
