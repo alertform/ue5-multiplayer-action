@@ -22,6 +22,7 @@ function M:OnJournalOpened()
     self:ClearLines()
     self.QuestLine  = self:AddLine(15, COL_TEXT)
     self.TimerLine  = self:AddLine(14, COL_ACCENT)
+    self.BuffLine   = self:AddLine(14, COL_ACCENT)
     self.FavorLine  = self:AddLine(14, COL_TRUST)
     self.StatsLine  = self:AddLine(13, COL_DIM)
     self.HintLine   = self:AddLine(12, COL_DIM)
@@ -56,6 +57,18 @@ function M:OnJournalRefresh()
     else
         self.QuestLine:SetText("暂无委托 —— 找云游剑客接任务")
         self.TimerLine:SetText("")
+    end
+
+    -- 当前增益（C++ 只报 GE_Buff_* 限时增益，冷却等噪音已过滤）
+    local buffs = ps:GetActiveBuffLines()
+    if buffs and buffs:Length() > 0 then
+        local parts = {}
+        for i = 1, buffs:Length() do
+            parts[#parts + 1] = buffs:Get(i)
+        end
+        self.BuffLine:SetText("增益：" .. table.concat(parts, " · "))
+    else
+        self.BuffLine:SetText("增益：无")
     end
 
     local favor = ps:GetNpcFavor()

@@ -20,10 +20,11 @@ DEFINE_LOG_CATEGORY_STATIC(LogMANarrative, Log, All);
 namespace
 {
 	// 运行时构造 transient GE（C++ 无内容资产引用）：任务奖励与全场赐福共用。
+	// GEName 带 Speed/Attack 语义 token —— PlayerState::GetActiveBuffLines 靠它翻译成增益展示。
 	UGameplayEffect* MANarrative_MakeTimedMultiplierGE(const FGameplayAttribute& Attribute,
-		float Multiplier, float DurationSeconds)
+		float Multiplier, float DurationSeconds, FName GEName)
 	{
-		UGameplayEffect* GE = NewObject<UGameplayEffect>(GetTransientPackage(), TEXT("GE_NarrativeBuff"));
+		UGameplayEffect* GE = NewObject<UGameplayEffect>(GetTransientPackage(), GEName);
 		GE->DurationPolicy = EGameplayEffectDurationType::HasDuration;
 		GE->DurationMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(DurationSeconds));
 		FGameplayModifierInfo Mod;
@@ -346,11 +347,11 @@ FString UMANarrativeSubsystem::ExecuteBlessing(const FString& ArgsJson, FString&
 	switch (Params.Type)
 	{
 	case MAWorldEventRules::EMABlessingType::Attack:
-		GE = MANarrative_MakeTimedMultiplierGE(UMAAttributeSet::GetAttackPowerAttribute(), 1.25f, Params.DurationSeconds);
+		GE = MANarrative_MakeTimedMultiplierGE(UMAAttributeSet::GetAttackPowerAttribute(), 1.25f, Params.DurationSeconds, TEXT("GE_Buff_Attack"));
 		BlessingName = TEXT("攻势如虹（攻击+25%）");
 		break;
 	case MAWorldEventRules::EMABlessingType::Speed:
-		GE = MANarrative_MakeTimedMultiplierGE(UMAAttributeSet::GetMoveSpeedAttribute(), 1.25f, Params.DurationSeconds);
+		GE = MANarrative_MakeTimedMultiplierGE(UMAAttributeSet::GetMoveSpeedAttribute(), 1.25f, Params.DurationSeconds, TEXT("GE_Buff_Speed"));
 		BlessingName = TEXT("身轻如燕（移速+25%）");
 		break;
 	case MAWorldEventRules::EMABlessingType::Regen:
@@ -686,32 +687,27 @@ void UMANarrativeSubsystem::GrantQuestReward(AMAPlayerState* PS)
 
 	// 奖励规则（spec）：限时→移速×1.3/60s；kill_count≥7→攻击×1.3/60s；其余→立即回血 50。
 	// 运行时构造 transient GE：C++ 不引用内容资产，规则一眼可读。
-	UGameplayEffect* GE = NewObject<UGameplayEffect>(GetTransientPackage(), TEXT("GE_QuestReward"));
+	UGameplayEffect* GE = nullptr;
 	FGameplayModifierInfo Mod;
 	if (Q.Type == EMAQuestType::TimedKill)
 	{
-		GE->DurationPolicy = EGameplayEffectDurationType::HasDuration;
-		GE->DurationMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(60.f));
-		Mod.Attribute = UMAAttributeSet::GetMoveSpeedAttribute();
-		Mod.ModifierOp = EGameplayModOp::Multiplicitive;
-		Mod.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(1.3f));
+		GE = MANarrative_MakeTimedMultiplierGE(UMAAttributeSet::GetMoveSpeedAttribute(),
+			1.3f, 60.f, TEXT("GE_Buff_Speed"));
 	}
 	else if (Q.TargetKills >= 7)
 	{
-		GE->DurationPolicy = EGameplayEffectDurationType::HasDuration;
-		GE->DurationMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(60.f));
-		Mod.Attribute = UMAAttributeSet::GetAttackPowerAttribute();
-		Mod.ModifierOp = EGameplayModOp::Multiplicitive;
-		Mod.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(1.3f));
+		GE = MANarrative_MakeTimedMultiplierGE(UMAAttributeSet::GetAttackPowerAttribute(),
+			1.3f, 60.f, TEXT("GE_Buff_Attack"));
 	}
 	else
 	{
+		GE = NewObject<UGameplayEffect>(GetTransientPackage(), TEXT("GE_QuestHeal"));
 		GE->DurationPolicy = EGameplayEffectDurationType::Instant;
 		Mod.Attribute = UMAAttributeSet::GetHealthAttribute();
 		Mod.ModifierOp = EGameplayModOp::Additive;
 		Mod.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(50.f));
+		GE->Modifiers.Add(Mod); // 仅 heal 分支需要——helper 分支的修饰器已在函数内配好
 	}
-	GE->Modifiers.Add(Mod);
 
 	FGameplayEffectContextHandle Ctx = ASC->MakeEffectContext();
 	ASC->ApplyGameplayEffectToSelf(GE, 1.f, Ctx);

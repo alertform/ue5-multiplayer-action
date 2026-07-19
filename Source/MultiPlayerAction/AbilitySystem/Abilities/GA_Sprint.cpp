@@ -37,7 +37,9 @@ void UGA_Sprint::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	// Boost via attribute — Character listens to MoveSpeed delegate and updates MaxWalkSpeed
 	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
 	{
-		OriginalWalkSpeed = ASC->GetNumericAttribute(UMAAttributeSet::GetMoveSpeedAttribute());
+		// 记【底数】而非当前值：当前值含乘法 buff（任务移速奖励/赐福 ×1.3），
+		// 把它写回底数会在 buff 过期后把加成永久烙进基础速度（棘轮式越冲越快）。
+		OriginalWalkSpeed = ASC->GetNumericAttributeBase(UMAAttributeSet::GetMoveSpeedAttribute());
 		ASC->SetNumericAttributeBase(UMAAttributeSet::GetMoveSpeedAttribute(), SprintSpeed);
 	}
 

@@ -43,6 +43,11 @@ public:
 	/** lua UI 只读缝（任务日志面板）；BlueprintPure = UnLua 可直接调。 */
 	UFUNCTION(BlueprintPure, Category = "Narrative")
 	FMAQuestState GetActiveQuestState() const { return ActiveQuest; }
+
+	/** 当前叙事增益清单（"移速提升 剩 43 秒"…）；只报 GE_Buff_* 命名的限时增益，
+	 *  过滤掉冷却/常驻 regen 等噪音。Mixed 复制模式下 owner 端能看到自己的 GE。 */
+	UFUNCTION(BlueprintPure, Category = "Narrative")
+	TArray<FString> GetActiveBuffLines() const;
 	void SetActiveQuest(const FMAQuestState& InQuest) { ActiveQuest = InQuest; }
 	FMAQuestState& GetMutableActiveQuest() { return ActiveQuest; }
 
