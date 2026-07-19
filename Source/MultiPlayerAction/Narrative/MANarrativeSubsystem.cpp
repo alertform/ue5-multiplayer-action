@@ -56,7 +56,7 @@ FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
 
 	PS->SetActiveQuest(MAQuestRules::MakeActiveQuest(Params, NowServerTime()));
 	PS->IncrementQuestsIssued();
-	SpawnQuestEnemies(Npc, Params.KillCount);
+	SpawnQuestEnemies(PS, Npc, Params.KillCount);
 	OutSpokenLine = Params.QuestLine;
 	UE_LOG(LogMANarrative, Display, TEXT("已发布任务：击杀 %d，限时 %d 秒（%s）"),
 		Params.KillCount, Params.TimeLimitSeconds, *PS->GetPlayerName());
@@ -66,14 +66,15 @@ FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
 			? *FString::Printf(TEXT("（限时 %d 秒）"), Params.TimeLimitSeconds) : TEXT(""));
 }
 
-void UMANarrativeSubsystem::SpawnQuestEnemies(const UMADialogueComponent* Npc, int32 Count)
+void UMANarrativeSubsystem::SpawnQuestEnemies(AMAPlayerState* PS, const UMADialogueComponent* Npc, int32 Count)
 {
 	UWorld* World = GetWorld();
 	const AActor* Anchor = Npc ? Npc->GetOwner() : nullptr;
 	if (!World || !Anchor || !Npc->QuestEnemyClass)
 	{
-		return; // 未配置刷怪类 = 只发任务（关卡预置敌人的击杀同样计进度）
+		return; // 未配置刷怪类 = 只发任务
 	}
+	TArray<TWeakObjectPtr<ACharacter>>& Ledger = QuestSpawnedEnemies.FindOrAdd(PS);
 
 	const FVector Center = Anchor->GetActorLocation();
 	const float AngleStep = 2.f * PI / FMath::Max(1, Count);
@@ -92,6 +93,7 @@ void UMANarrativeSubsystem::SpawnQuestEnemies(const UMADialogueComponent* Npc, i
 		if (Enemy)
 		{
 			++Spawned;
+			Ledger.Add(Enemy);
 			if (!Enemy->GetController())
 			{
 				Enemy->SpawnDefaultController(); // 运行时刷出的 pawn 不吃 Placed-in-World 自动上脑
@@ -113,6 +115,30 @@ void UMANarrativeSubsystem::NotifyKill(AMAPlayerState* KillerPS)
 	if (Result == MAQuestRules::EMAQuestKillResult::JustCompleted)
 	{
 		GrantQuestReward(KillerPS);
+		CleanupQuestEnemies(KillerPS); // 残余目标随任务一起谢幕（PvP 击杀也计进度，可能有剩）
+	}
+}
+
+void UMANarrativeSubsystem::CleanupQuestEnemies(AMAPlayerState* PS)
+{
+	TArray<TWeakObjectPtr<ACharacter>>* Ledger = QuestSpawnedEnemies.Find(PS);
+	if (!Ledger)
+	{
+		return;
+	}
+	int32 Removed = 0;
+	for (const TWeakObjectPtr<ACharacter>& Enemy : *Ledger)
+	{
+		if (ACharacter* Alive = Enemy.Get())
+		{
+			Alive->Destroy();
+			++Removed;
+		}
+	}
+	QuestSpawnedEnemies.Remove(PS);
+	if (Removed > 0)
+	{
+		UE_LOG(LogMANarrative, Display, TEXT("任务清场：移除 %d 个残余刷怪"), Removed);
 	}
 }
 
@@ -156,7 +182,10 @@ void UMANarrativeSubsystem::Tick(float DeltaTime)
 		{
 			if (AMAPlayerState* MPS = Cast<AMAPlayerState>(PS))
 			{
-				MAQuestRules::CheckExpired(MPS->GetMutableActiveQuest(), NowServerTime());
+				if (MAQuestRules::CheckExpired(MPS->GetMutableActiveQuest(), NowServerTime()))
+				{
+					CleanupQuestEnemies(MPS); // 超时任务的目标一并清场
+				}
 			}
 		}
 	}

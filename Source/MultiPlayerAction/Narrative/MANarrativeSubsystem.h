@@ -6,6 +6,7 @@
 #include "Narrative/MAQuestTypes.h"
 #include "MANarrativeSubsystem.generated.h"
 
+class ACharacter;
 class AMAPlayerController;
 class AMAPlayerState;
 class UMADialogueComponent;
@@ -42,8 +43,13 @@ public:
 
 private:
 	void GrantQuestReward(AMAPlayerState* PS);
-	/** 发任务时绕锚点环形刷出任务目标（SpawnDefaultController 保证 AI 上脑）。 */
-	void SpawnQuestEnemies(const UMADialogueComponent* Npc, int32 Count);
+	/** 发任务时绕锚点环形刷出任务目标（SpawnDefaultController 保证 AI 上脑），并记账以便清场。 */
+	void SpawnQuestEnemies(AMAPlayerState* PS, const UMADialogueComponent* Npc, int32 Count);
+	/** 任务终结（完成/超时）时清掉该玩家残余的任务刷怪 —— 竞技场无任务时保持空场。 */
+	void CleanupQuestEnemies(AMAPlayerState* PS);
 	double NowServerTime() const;
 	float ExpirySweepAccum = 0.f;
+
+	/** 每玩家在场的任务刷怪（弱引用；被杀的自然失效）。 */
+	TMap<TWeakObjectPtr<AMAPlayerState>, TArray<TWeakObjectPtr<ACharacter>>> QuestSpawnedEnemies;
 };
