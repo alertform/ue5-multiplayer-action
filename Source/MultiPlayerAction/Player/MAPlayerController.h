@@ -57,6 +57,9 @@ public:
 	/** 交互输入（Character 的 IA_Interact Started 路由至此）：搜寻半径内最近 NPC，找到即开窗。 */
 	void OnInteractPressed();
 
+	/** J 键：任务日志面板开合（widget 骨架 C++，界面逻辑在 lua UI.QuestJournal）。 */
+	void ToggleQuestJournal();
+
 	/** 触屏控件用：对话打开期间战斗按钮静默忽略。 */
 	bool IsDialogueOpen() const { return bDialogueOpen; }
 
@@ -111,6 +114,12 @@ protected:
 	/** 底部叙事字幕条（任务节拍/世界事件公告）。纯 C++ 类直建，无 BP。 */
 	UPROPERTY()
 	TObjectPtr<class UMAAnnounceWidget> AnnounceWidget;
+
+	/** 任务日志面板（C++ 骨架 + lua 逻辑）。 */
+	UPROPERTY()
+	TObjectPtr<class UMAQuestJournalWidget> QuestJournalWidget;
+
+	virtual void SetupInputComponent() override;
 
 	/** Tab scoreboard / post-match results panel. Defaults to the C++ class. */
 	UPROPERTY(EditDefaultsOnly, Category = "UI")

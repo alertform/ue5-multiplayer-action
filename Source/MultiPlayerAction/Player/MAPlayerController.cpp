@@ -5,6 +5,7 @@
 #include "UI/MAMatchStatusWidget.h"
 #include "UI/MAQuestTrackerWidget.h"
 #include "UI/MAAnnounceWidget.h"
+#include "UI/MAQuestJournalWidget.h"
 #include "UI/MAScoreboardWidget.h"
 #include "UI/MAKillFeedWidget.h"
 #include "UI/MADialogueWidget.h"
@@ -85,6 +86,34 @@ void AMAPlayerController::OnRep_PlayerState()
 	Super::OnRep_PlayerState();
 	// Client path: PS just replicated — retry HUD init in case BeginPlay ran first
 	EnsureHUDInitialized();
+}
+
+void AMAPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	// UI 开合走 PC 层 legacy BindKey：不动 IMC 资产（对话窗打开时是 UIOnly 输入模式，
+	// J 会落进输入框而非此绑定，天然互斥）。
+	InputComponent->BindKey(EKeys::J, IE_Pressed, this, &AMAPlayerController::ToggleQuestJournal);
+}
+
+void AMAPlayerController::ToggleQuestJournal()
+{
+	if (!QuestJournalWidget)
+	{
+		QuestJournalWidget = CreateWidget<UMAQuestJournalWidget>(this, UMAQuestJournalWidget::StaticClass());
+		if (!QuestJournalWidget)
+		{
+			return;
+		}
+		QuestJournalWidget->AddToViewport(6);
+	}
+	const bool bShow = QuestJournalWidget->GetVisibility() == ESlateVisibility::Collapsed;
+	QuestJournalWidget->SetVisibility(bShow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	if (bShow)
+	{
+		QuestJournalWidget->OnJournalOpened(); // lua 实现：重建行结构 + 首刷
+	}
 }
 
 // ===== NPC LLM 流式对话 =====

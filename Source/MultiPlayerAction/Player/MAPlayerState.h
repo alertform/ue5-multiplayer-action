@@ -39,6 +39,10 @@ public:
 
 	/** 当前叙事任务（复制；HUD 轮询读）。服务器经 Set/GetMutable 写。 */
 	const FMAQuestState& GetActiveQuest() const { return ActiveQuest; }
+
+	/** lua UI 只读缝（任务日志面板）；BlueprintPure = UnLua 可直接调。 */
+	UFUNCTION(BlueprintPure, Category = "Narrative")
+	FMAQuestState GetActiveQuestState() const { return ActiveQuest; }
 	void SetActiveQuest(const FMAQuestState& InQuest) { ActiveQuest = InQuest; }
 	FMAQuestState& GetMutableActiveQuest() { return ActiveQuest; }
 
