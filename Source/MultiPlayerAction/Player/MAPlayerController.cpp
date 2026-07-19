@@ -6,6 +6,8 @@
 #include "UI/MAQuestTrackerWidget.h"
 #include "UI/MAAnnounceWidget.h"
 #include "UI/MAQuestJournalWidget.h"
+#include "UI/MAEscMenuWidget.h"
+#include "Online/MASessionSubsystem.h"
 #include "UI/MAScoreboardWidget.h"
 #include "UI/MAKillFeedWidget.h"
 #include "UI/MADialogueWidget.h"
@@ -93,8 +95,67 @@ void AMAPlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 
 	// UI 开合走 PC 层 legacy BindKey：不动 IMC 资产（对话窗打开时是 UIOnly 输入模式，
-	// J 会落进输入框而非此绑定，天然互斥）。
+	// J/Esc 会落进输入框而非此绑定，天然互斥）。
 	InputComponent->BindKey(EKeys::J, IE_Pressed, this, &AMAPlayerController::ToggleQuestJournal);
+	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AMAPlayerController::ToggleEscMenu);
+}
+
+void AMAPlayerController::ToggleEscMenu()
+{
+	if (bDialogueOpen)
+	{
+		return; // 对话窗自己管 Esc
+	}
+	if (!EscMenuWidget)
+	{
+		EscMenuWidget = CreateWidget<UMAEscMenuWidget>(this, UMAEscMenuWidget::StaticClass());
+		if (!EscMenuWidget)
+		{
+			return;
+		}
+		EscMenuWidget->AddToViewport(20);
+	}
+	if (EscMenuWidget->GetVisibility() == ESlateVisibility::Collapsed)
+	{
+		EscMenuWidget->SetVisibility(ESlateVisibility::Visible);
+		// GameAndUI：既能点按钮，Esc 再按一次也仍走本绑定关闭（多人不暂停，纯覆层）。
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+		SetShowMouseCursor(true);
+		EscMenuWidget->OnMenuOpened(); // lua：首开建菜单项
+	}
+	else
+	{
+		CloseEscMenu();
+	}
+}
+
+void AMAPlayerController::CloseEscMenu()
+{
+	if (EscMenuWidget)
+	{
+		EscMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+	SetShowMouseCursor(false);
+}
+
+void AMAPlayerController::ReturnToMainMenu()
+{
+	CloseEscMenu();
+	if (UMASessionSubsystem* Session = GetGameInstance() ? GetGameInstance()->GetSubsystem<UMASessionSubsystem>() : nullptr)
+	{
+		Session->DestroyCurrentSession(); // 异步；旅行不等它——NULL OSS 会话进程级，回菜单后重开会走 stale 清理
+	}
+	ClientTravel(TEXT("/Game/Maps/MainMenu"), ETravelType::TRAVEL_Absolute);
+}
+
+void AMAPlayerController::QuitToDesktop()
+{
+	ConsoleCommand(TEXT("quit"));
 }
 
 void AMAPlayerController::ToggleQuestJournal()

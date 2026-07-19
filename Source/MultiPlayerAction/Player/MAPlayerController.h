@@ -57,8 +57,25 @@ public:
 	/** 交互输入（Character 的 IA_Interact Started 路由至此）：搜寻半径内最近 NPC，找到即开窗。 */
 	void OnInteractPressed();
 
-	/** J 键：任务日志面板开合（widget 骨架 C++，界面逻辑在 lua UI.QuestJournal）。 */
+	/** J 键：任务日志面板开合（widget 骨架 C++，界面逻辑在 lua UI.QuestJournal）。BlueprintCallable 供 lua 菜单调。 */
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void ToggleQuestJournal();
+
+	/** Esc 键：游戏内菜单开合（菜单项在 lua UI.EscMenu）。 */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ToggleEscMenu();
+
+	/** lua 菜单动作：关菜单继续游戏。 */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void CloseEscMenu();
+
+	/** lua 菜单动作：销毁会话并回主菜单（host 离开=全房解散,客户端断连兜底会送回菜单）。 */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ReturnToMainMenu();
+
+	/** lua 菜单动作：退出游戏进程。 */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void QuitToDesktop();
 
 	/** 触屏控件用：对话打开期间战斗按钮静默忽略。 */
 	bool IsDialogueOpen() const { return bDialogueOpen; }
@@ -118,6 +135,10 @@ protected:
 	/** 任务日志面板（C++ 骨架 + lua 逻辑）。 */
 	UPROPERTY()
 	TObjectPtr<class UMAQuestJournalWidget> QuestJournalWidget;
+
+	/** ESC 菜单（C++ 骨架 + lua 菜单项）。 */
+	UPROPERTY()
+	TObjectPtr<class UMAEscMenuWidget> EscMenuWidget;
 
 	virtual void SetupInputComponent() override;
 
