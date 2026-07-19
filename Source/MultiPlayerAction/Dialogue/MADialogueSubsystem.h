@@ -55,6 +55,10 @@ private:
 		/** 客户端用来丢弃打断后迟到增量的序号。 */
 		int32 MessageId = 0;
 		float FlushAccum = 0.f;
+
+		/** 窗口已关但请求仍在飞行：让工具调用（发任务）执行完，完成后再销毁会话。
+		 *  没有这个标记时，关窗=取消请求=玩家"以为接到了任务"（实测两次踩坑）。 */
+		bool bWindowClosed = false;
 	};
 
 	TMap<TWeakObjectPtr<AMAPlayerController>, FSession> Sessions;

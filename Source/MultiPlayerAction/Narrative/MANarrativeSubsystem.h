@@ -8,6 +8,7 @@
 
 class AMAPlayerController;
 class AMAPlayerState;
+class UMADialogueComponent;
 
 /**
  * LLM 叙事动作的服务器权威执行器（Phase 1：give_quest）。
@@ -24,8 +25,10 @@ public:
 	/** give_quest 的 OpenAI 工具声明（schema 与 MAQuestRules 钳制范围一致）。 */
 	static FMALLMToolSpec GetGiveQuestToolSpec();
 
-	/** 执行一个工具调用；返回回填给模型的结果文本。接受 give_quest 时 OutSpokenLine=quest_line。 */
-	FString ExecuteToolCall(AMAPlayerController* PC, const FMALLMToolCall& Call, FString& OutSpokenLine);
+	/** 执行一个工具调用；返回回填给模型的结果文本。接受 give_quest 时 OutSpokenLine=quest_line。
+	 *  Npc 提供刷怪配置（QuestEnemyClass）与刷怪锚点位置，可为 null（不刷怪只发任务）。 */
+	FString ExecuteToolCall(AMAPlayerController* PC, const UMADialogueComponent* Npc,
+		const FMALLMToolCall& Call, FString& OutSpokenLine);
 
 	/** GameMode 击杀路由：推进 killer 的任务进度，完成即发奖励。 */
 	void NotifyKill(AMAPlayerState* KillerPS);
@@ -39,6 +42,8 @@ public:
 
 private:
 	void GrantQuestReward(AMAPlayerState* PS);
+	/** 发任务时绕锚点环形刷出任务目标（SpawnDefaultController 保证 AI 上脑）。 */
+	void SpawnQuestEnemies(const UMADialogueComponent* Npc, int32 Count);
 	double NowServerTime() const;
 	float ExpirySweepAccum = 0.f;
 };

@@ -2,6 +2,8 @@
 
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/MAAttributeSet.h"
+#include "Dialogue/MADialogueComponent.h"
+#include "GameFramework/Character.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameplayEffect.h"
@@ -26,7 +28,7 @@ FMALLMToolSpec UMANarrativeSubsystem::GetGiveQuestToolSpec()
 }
 
 FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
-	const FMALLMToolCall& Call, FString& OutSpokenLine)
+	const UMADialogueComponent* Npc, const FMALLMToolCall& Call, FString& OutSpokenLine)
 {
 	OutSpokenLine.Reset();
 
@@ -54,13 +56,50 @@ FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
 
 	PS->SetActiveQuest(MAQuestRules::MakeActiveQuest(Params, NowServerTime()));
 	PS->IncrementQuestsIssued();
+	SpawnQuestEnemies(Npc, Params.KillCount);
 	OutSpokenLine = Params.QuestLine;
 	UE_LOG(LogMANarrative, Display, TEXT("已发布任务：击杀 %d，限时 %d 秒（%s）"),
 		Params.KillCount, Params.TimeLimitSeconds, *PS->GetPlayerName());
-	return FString::Printf(TEXT("成功：已发布击杀 %d 人的任务%s。完成由系统自动判定并发放奖励。"),
+	return FString::Printf(TEXT("成功：已发布击杀 %d 人的任务%s，目标已在附近现身。完成由系统自动判定并发放奖励。"),
 		Params.KillCount,
 		Params.TimeLimitSeconds > 0
 			? *FString::Printf(TEXT("（限时 %d 秒）"), Params.TimeLimitSeconds) : TEXT(""));
+}
+
+void UMANarrativeSubsystem::SpawnQuestEnemies(const UMADialogueComponent* Npc, int32 Count)
+{
+	UWorld* World = GetWorld();
+	const AActor* Anchor = Npc ? Npc->GetOwner() : nullptr;
+	if (!World || !Anchor || !Npc->QuestEnemyClass)
+	{
+		return; // 未配置刷怪类 = 只发任务（关卡预置敌人的击杀同样计进度）
+	}
+
+	const FVector Center = Anchor->GetActorLocation();
+	const float AngleStep = 2.f * PI / FMath::Max(1, Count);
+	int32 Spawned = 0;
+	for (int32 i = 0; i < Count; ++i)
+	{
+		// 环形展开 + 半径抖动：既不叠一起也不需要 navmesh 采样这种重依赖。
+		const float Angle = AngleStep * i + FMath::FRandRange(-0.3f, 0.3f);
+		const float Radius = FMath::FRandRange(700.f, 1100.f);
+		const FVector Location = Center + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 100.f);
+
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		ACharacter* Enemy = World->SpawnActor<ACharacter>(Npc->QuestEnemyClass, Location,
+			FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), SpawnParams);
+		if (Enemy)
+		{
+			++Spawned;
+			if (!Enemy->GetController())
+			{
+				Enemy->SpawnDefaultController(); // 运行时刷出的 pawn 不吃 Placed-in-World 自动上脑
+			}
+		}
+	}
+	UE_LOG(LogMANarrative, Display, TEXT("任务刷怪：%d/%d 个 %s"),
+		Spawned, Count, *Npc->QuestEnemyClass->GetName());
 }
 
 void UMANarrativeSubsystem::NotifyKill(AMAPlayerState* KillerPS)

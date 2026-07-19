@@ -51,6 +51,7 @@ void UMADialogueSubsystem::StartSession(AMAPlayerController* PC, UMADialogueComp
 
 	FSession& Session = Sessions.FindOrAdd(PC);
 	InterruptActiveRequest(Session);
+	Session.bWindowClosed = false; // 可能复用"关窗等收尾"的残留会话
 	Session.Npc = Npc;
 	Session.History.Reset();
 	Session.History.Emplace(EMALLMRole::System, BuildSystemPrompt(*Npc));
@@ -99,7 +100,8 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 		FString SystemPrompt = BuildSystemPrompt(*Npc);
 		if (UMANarrativeSubsystem* Narrative = GetWorld()->GetSubsystem<UMANarrativeSubsystem>())
 		{
-			SystemPrompt += FString::Printf(TEXT("\n当前玩家任务状态：%s。"),
+			SystemPrompt += FString::Printf(TEXT("\n当前玩家任务状态：%s。"
+				"答应给玩家任务时必须调用 give_quest 工具正式发布，不得只在口头承诺。"),
 				*Narrative->DescribeQuestState(PC));
 		}
 		Session->History[0].Content = MoveTemp(SystemPrompt);
@@ -163,7 +165,7 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 			{
 				FString SpokenLine;
 				FMALLMMessage ToolMsg(EMALLMRole::Tool, Narrative
-					? Narrative->ExecuteToolCall(Controller, Call, SpokenLine)
+					? Narrative->ExecuteToolCall(Controller, S->Npc.Get(), Call, SpokenLine)
 					: TEXT("失败：叙事系统不可用。"));
 				ToolMsg.ToolCallId = Call.Id;
 				S->History.Add(MoveTemp(ToolMsg));
@@ -186,6 +188,12 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 		S->ActiveRequest.Reset();
 		S->StreamedSoFar.Reset();
 		Controller->Client_DialogueCompleted(Id);
+
+		// 关窗等收尾的会话：工具已执行、历史已无用，就地销毁。
+		if (S->bWindowClosed)
+		{
+			Self->Sessions.Remove(Controller);
+		}
 	};
 	Callbacks.OnError = [WeakThis, WeakPC, Id](const FString& Message)
 	{
@@ -208,6 +216,10 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 		}
 		S->ActiveRequest.Reset();
 		Controller->Client_DialogueError(Message);
+		if (S->bWindowClosed)
+		{
+			Self->Sessions.Remove(Controller);
+		}
 	};
 
 	// 声明叙事工具 —— 模型可在对话中发起 give_quest，执行前过服务器校验管线。
@@ -224,14 +236,26 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 
 bool UMADialogueSubsystem::IsInDialogue(const AMAPlayerController* PC) const
 {
-	return PC && Sessions.Contains(TWeakObjectPtr<AMAPlayerController>(const_cast<AMAPlayerController*>(PC)));
+	// 关窗等请求收尾的残留会话不算"对话中" —— AI 目标豁免不该继续生效。
+	const FSession* S = PC
+		? Sessions.Find(TWeakObjectPtr<AMAPlayerController>(const_cast<AMAPlayerController*>(PC))) : nullptr;
+	return S && !S->bWindowClosed;
 }
 
 void UMADialogueSubsystem::EndSession(AMAPlayerController* PC)
 {
 	if (const TWeakObjectPtr<AMAPlayerController> Key(PC); Sessions.Contains(Key))
 	{
-		InterruptActiveRequest(Sessions[Key]);
+		FSession& Session = Sessions[Key];
+		// 关窗不打断飞行中的请求 —— 工具调用（发任务）必须执行完；
+		// 迟到的台词增量客户端会按 stale MessageId 丢弃，无副作用。
+		if (Session.ActiveRequest.IsValid() && Session.ActiveRequest->IsActive())
+		{
+			Session.bWindowClosed = true;
+			UE_LOG(LogMADialogue, Log, TEXT("会话关窗但请求飞行中，等它完成：%s"), *PC->GetName());
+			return;
+		}
+		InterruptActiveRequest(Session);
 		Sessions.Remove(Key);
 		UE_LOG(LogMADialogue, Log, TEXT("会话结束：%s"), *PC->GetName());
 	}

@@ -2,7 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Templates/SubclassOf.h"
 #include "MADialogueComponent.generated.h"
+
+class ACharacter;
 
 /**
  * 挂上即成"可对话 NPC"的数据组件 —— 名字、人设、开场白、交互半径全部 per-NPC。
@@ -36,4 +39,16 @@ public:
 	/** 可发起对话的距离（厘米）；服务器验证时另加 50% 容差。 */
 	UPROPERTY(EditAnywhere, Category = "Dialogue", meta = (ClampMin = "100.0", ClampMax = "2000.0"))
 	float InteractRadius = 350.f;
+
+	/** 发布任务时在 NPC 周围刷出的敌人类（如 BP_TargetDummy）；None = 不刷怪只发任务。 */
+	UPROPERTY(EditAnywhere, Category = "Quest")
+	TSubclassOf<ACharacter> QuestEnemyClass;
+
+protected:
+	virtual void BeginPlay() override;
+
+private:
+	/** 头顶铭牌（名字 + 交互提示）——运行时挂到 owner 上，纯 C++ 无 BP 资产。 */
+	UPROPERTY()
+	TObjectPtr<class UWidgetComponent> NameplateComponent;
 };
