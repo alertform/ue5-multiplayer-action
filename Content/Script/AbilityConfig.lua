@@ -9,7 +9,8 @@ return {
         MaxLungeDistanceCm = 350,
         StopDistanceCm   = 120,
         NoTargetDashCm   = 0,   -- 0 = 落空时让原生 1.4-3.4m 步进原样播放
-        DamageMultiplier = 1.0, -- 伤害 = AttackPower × 此系数 × 护甲/格挡减免
+        DamageMultiplier   = 10.0, -- 玩家专用：伤害 = AttackPower × 此系数 × 护甲/格挡减免
+        AIDamageMultiplier = 1.0,  -- AI 专用，独立调 —— 改玩家手感不会连带 AI 变强
     },
     Fireball = {
         ExplosionRadius  = 300,

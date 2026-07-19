@@ -55,4 +55,8 @@ protected:
 	float ReadConfigFloat(FName Param, float Default) const;
 	/** 从 Lua 配置读 FName，缺配置/缺键 → Default。 */
 	FName ReadConfigName(FName Param, FName Default) const;
+
+	/** 伤害系数按持有者分家：玩家读 DamageMultiplier，AI 读 AIDamageMultiplier（缺键各回退 1.0）。
+	 *  玩家和 AI 共用同一个 GA —— 单一键会让调玩家手感时顺带把 AI 也加强（一刀砍死事故）。 */
+	float ReadDamageMultiplier() const;
 };

@@ -93,9 +93,9 @@ void UGA_DashSlash::OnHitEvent(FGameplayEventData EventData)
 		return;
 	}
 	const FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffect, GetAbilityLevel());
-	// lua 可调的每技能伤害系数（缺键=1.0 原伤害）；ExecCalc 乘进最终公式。
+	// lua 可调伤害系数，玩家/AI 分键（缺键=1.0）；ExecCalc 乘进最终公式。
 	SpecHandle.Data->SetSetByCallerMagnitude(MAGameplayTags::Data_DamageMultiplier,
-		ReadConfigFloat(TEXT("DamageMultiplier"), 1.f));
+		ReadDamageMultiplier());
 	MAMeleeHitOps::SweepAndApplyMeleeHit(Avatar, SourceASC, SpecHandle,
 		ReadConfigFloat(TEXT("TraceDistance"), TraceDistance),
 		ReadConfigFloat(TEXT("TraceRadius"), TraceRadius));

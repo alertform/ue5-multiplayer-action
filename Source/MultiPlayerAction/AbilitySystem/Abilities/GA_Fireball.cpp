@@ -144,9 +144,9 @@ void UGA_Fireball::SpawnProjectile(const FGameplayAbilityActorInfo* ActorInfo)
 	// Snapshot the damage spec NOW — ExecCalc captures source AttackPower at spec-creation time,
 	// so the fireball lands with cast-time stats even if the caster dies mid-flight.
 	const FGameplayEffectSpecHandle DamageSpec = MakeOutgoingGameplayEffectSpec(DamageEffect, GetAbilityLevel());
-	// lua 可调的每技能伤害系数（缺键=1.0 原伤害）；ExecCalc 乘进最终公式。
+	// lua 可调伤害系数，玩家/AI 分键（缺键=1.0）；ExecCalc 乘进最终公式。
 	DamageSpec.Data->SetSetByCallerMagnitude(MAGameplayTags::Data_DamageMultiplier,
-		ReadConfigFloat(TEXT("DamageMultiplier"), 1.f));
+		ReadDamageMultiplier());
 
 	const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 	AMAProjectile* Projectile = Avatar->GetWorld()->SpawnActorDeferred<AMAProjectile>(

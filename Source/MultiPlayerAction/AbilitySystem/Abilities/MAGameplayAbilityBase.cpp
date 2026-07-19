@@ -108,6 +108,13 @@ float UMAGameplayAbilityBase::ReadConfigFloat(FName Param, float Default) const
 	return Cfg ? Cfg->GetFloat(ConfigKey, Param, Default) : Default;
 }
 
+float UMAGameplayAbilityBase::ReadDamageMultiplier() const
+{
+	const APawn* Avatar = Cast<APawn>(GetAvatarActorFromActorInfo());
+	const bool bPlayerControlled = Avatar && Avatar->IsPlayerControlled();
+	return ReadConfigFloat(bPlayerControlled ? FName("DamageMultiplier") : FName("AIDamageMultiplier"), 1.f);
+}
+
 FName UMAGameplayAbilityBase::ReadConfigName(FName Param, FName Default) const
 {
 	if (ConfigKey.IsNone()) { return Default; }
