@@ -29,6 +29,18 @@ void AMAGameState::Multicast_OnNarrativeAnnounce_Implementation(const FString& T
 	OnAnnounceEvent.Broadcast(Text);
 }
 
+void AMAGameState::Multicast_OnNarrativeFX_Implementation(EMANarrativeFX Type,
+	const TArray<FVector_NetQuantize>& Locations)
+{
+	TArray<FVector> Full;
+	Full.Reserve(Locations.Num());
+	for (const FVector_NetQuantize& Loc : Locations)
+	{
+		Full.Add(Loc);
+	}
+	OnNarrativeFXEvent.Broadcast(Type, Full);
+}
+
 void AMAGameState::HandleMatchHasEnded()
 {
 	Super::HandleMatchHasEnded();

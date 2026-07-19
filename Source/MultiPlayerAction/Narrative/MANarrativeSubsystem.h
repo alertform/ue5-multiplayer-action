@@ -10,6 +10,7 @@ class ACharacter;
 class AMAPlayerController;
 class AMAPlayerState;
 class UMADialogueComponent;
+enum class EMANarrativeFX : uint8;
 
 /**
  * LLM 叙事动作的服务器权威执行器（Phase 1：give_quest）。
@@ -58,6 +59,9 @@ public:
 private:
 	/** 全场字幕公告（server → GameState multicast → 每台机器的字幕条）。 */
 	void Announce(const FString& Text);
+
+	/** 叙事特效落点广播（server → GameState multicast → 各机器 DialogueComponent 本地播）。 */
+	void BroadcastFX(EMANarrativeFX Type, const TArray<FVector>& Locations);
 
 	FString ExecuteRaid(AMAPlayerController* PC, const UMADialogueComponent* Npc,
 		const FString& ArgsJson, FString& OutSpokenLine);

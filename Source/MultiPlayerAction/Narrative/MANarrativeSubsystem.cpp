@@ -219,31 +219,22 @@ void UMANarrativeSubsystem::SpawnQuestEnemies(AMAPlayerState* PS, const UMADialo
 		return; // 未配置刷怪类 = 只发任务
 	}
 	TArray<TWeakObjectPtr<ACharacter>>& Ledger = QuestSpawnedEnemies.FindOrAdd(PS);
+	const int32 LedgerBase = Ledger.Num();
 
-	const FVector Center = Anchor->GetActorLocation();
-	const float AngleStep = 2.f * PI / FMath::Max(1, Count);
-	int32 Spawned = 0;
-	for (int32 i = 0; i < Count; ++i)
+	const int32 Spawned = MANarrative_SpawnRing(World, Anchor->GetActorLocation(),
+		Npc->QuestEnemyClass, Count, Ledger);
+
+	// 现身特效打在每个落点。
+	TArray<FVector> FXLocations;
+	for (int32 i = LedgerBase; i < Ledger.Num(); ++i)
 	{
-		// 环形展开 + 半径抖动：既不叠一起也不需要 navmesh 采样这种重依赖。
-		const float Angle = AngleStep * i + FMath::FRandRange(-0.3f, 0.3f);
-		const float Radius = FMath::FRandRange(700.f, 1100.f);
-		const FVector Location = Center + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 100.f);
-
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-		ACharacter* Enemy = World->SpawnActor<ACharacter>(Npc->QuestEnemyClass, Location,
-			FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), SpawnParams);
-		if (Enemy)
+		if (const ACharacter* Alive = Ledger[i].Get())
 		{
-			++Spawned;
-			Ledger.Add(Enemy);
-			if (!Enemy->GetController())
-			{
-				Enemy->SpawnDefaultController(); // 运行时刷出的 pawn 不吃 Placed-in-World 自动上脑
-			}
+			FXLocations.Add(Alive->GetActorLocation());
 		}
 	}
+	BroadcastFX(EMANarrativeFX::EnemySpawn, FXLocations);
+
 	UE_LOG(LogMANarrative, Display, TEXT("任务刷怪：%d/%d 个 %s"),
 		Spawned, Count, *Npc->QuestEnemyClass->GetName());
 }
@@ -280,6 +271,19 @@ FString UMANarrativeSubsystem::ExecuteRaid(AMAPlayerController* PC,
 	TArray<TWeakObjectPtr<ACharacter>> RaidLedger;
 	const int32 Spawned = MANarrative_SpawnRing(GetWorld(), Anchor->GetActorLocation(),
 		Npc->QuestEnemyClass, Params.EnemyCount, RaidLedger);
+
+	// 现身特效打在每个落点。
+	{
+		TArray<FVector> FXLocations;
+		for (const TWeakObjectPtr<ACharacter>& Enemy : RaidLedger)
+		{
+			if (const ACharacter* Alive = Enemy.Get())
+			{
+				FXLocations.Add(Alive->GetActorLocation());
+			}
+		}
+		BroadcastFX(EMANarrativeFX::EnemySpawn, FXLocations);
+	}
 
 	// 没被杀完的敌袭到点自然消散 —— 不永占"空场"竞技场。
 	TWeakObjectPtr<UMANarrativeSubsystem> WeakThis(this);
@@ -445,6 +449,22 @@ void UMANarrativeSubsystem::Announce(const FString& Text)
 	}
 }
 
+void UMANarrativeSubsystem::BroadcastFX(EMANarrativeFX Type, const TArray<FVector>& Locations)
+{
+	AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr;
+	if (!GS || Locations.Num() == 0)
+	{
+		return;
+	}
+	TArray<FVector_NetQuantize> Quantized;
+	Quantized.Reserve(Locations.Num());
+	for (const FVector& Loc : Locations)
+	{
+		Quantized.Add(Loc);
+	}
+	GS->Multicast_OnNarrativeFX(Type, Quantized);
+}
+
 void UMANarrativeSubsystem::NotifyKill(AMAPlayerState* KillerPS)
 {
 	if (!KillerPS)
@@ -570,6 +590,8 @@ void UMANarrativeSubsystem::SetQuestGiverAway(AActor* NpcOwner, bool bAway)
 	{
 		NpcOwner->SetActorHiddenInGame(bShouldHide);
 		NpcOwner->SetActorEnableCollision(!bShouldHide);
+		BroadcastFX(bShouldHide ? EMANarrativeFX::GiverVanish : EMANarrativeFX::GiverAppear,
+			{ NpcOwner->GetActorLocation() });
 		UE_LOG(LogMANarrative, Display, TEXT("任务发布者%s：%s"),
 			bShouldHide ? TEXT("离场") : TEXT("回归"), *NpcOwner->GetName());
 	}

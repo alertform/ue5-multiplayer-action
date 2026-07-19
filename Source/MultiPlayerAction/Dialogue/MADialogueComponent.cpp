@@ -1,11 +1,17 @@
 #include "Dialogue/MADialogueComponent.h"
 
 #include "Components/WidgetComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "UI/MANpcNameplateWidget.h"
 
 void UMADialogueComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 特效分发需要 GameState 委托，晚到就轮询（绑上即停 tick）。
+	PrimaryComponentTick.bCanEverTick = true;
+	SetComponentTickEnabled(true);
 
 	AActor* Owner = GetOwner();
 	if (!Owner)
@@ -26,5 +32,47 @@ void UMADialogueComponent::BeginPlay()
 	if (UMANpcNameplateWidget* Nameplate = Cast<UMANpcNameplateWidget>(NameplateComponent->GetUserWidgetObject()))
 	{
 		Nameplate->Setup(NpcName, InteractRadius, Owner);
+	}
+}
+
+void UMADialogueComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+	FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (bBoundToGameState)
+	{
+		SetComponentTickEnabled(false);
+		return;
+	}
+	if (AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr)
+	{
+		GS->OnNarrativeFXEvent.AddUObject(this, &UMADialogueComponent::HandleNarrativeFX);
+		bBoundToGameState = true;
+		SetComponentTickEnabled(false);
+	}
+}
+
+void UMADialogueComponent::HandleNarrativeFX(EMANarrativeFX Type, const TArray<FVector>& Locations)
+{
+	// DS 无渲染不播；listen host / 客户端各自本地播。
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	UNiagaraSystem* System = nullptr;
+	switch (Type)
+	{
+	case EMANarrativeFX::GiverVanish: System = GiverVanishFX; break;
+	case EMANarrativeFX::GiverAppear: System = GiverAppearFX ? GiverAppearFX.Get() : GiverVanishFX.Get(); break;
+	case EMANarrativeFX::EnemySpawn:  System = EnemySpawnFX; break;
+	}
+	if (!System)
+	{
+		return; // 未配置 = 该节拍静默
+	}
+	for (const FVector& Location : Locations)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, System, Location);
 	}
 }

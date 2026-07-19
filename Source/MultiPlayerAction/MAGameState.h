@@ -14,6 +14,18 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FMAOnTauntEvent, const FString& /*Text*/);
 /** 叙事公告（任务节拍/世界事件）在每台机器上的本地分发 —— 底部字幕条消费。 */
 DECLARE_MULTICAST_DELEGATE_OneParam(FMAOnAnnounceEvent, const FString& /*Text*/);
 
+/** 叙事特效类型（资产引用在 MADialogueComponent 上按关卡实例配置）。 */
+UENUM()
+enum class EMANarrativeFX : uint8
+{
+	GiverVanish,
+	GiverAppear,
+	EnemySpawn,
+};
+
+/** 叙事特效在每台机器上的本地分发（类型 + 一组世界坐标）。 */
+DECLARE_MULTICAST_DELEGATE_TwoParams(FMAOnNarrativeFXEvent, EMANarrativeFX, const TArray<FVector>& /*Locations*/);
+
 /**
  * Match-scoped replicated state for the deathmatch loop. The engine MatchState machine
  * (AGameMode/AGameState) already drives the phases and replicates them — this class only
@@ -66,6 +78,12 @@ public:
 	void Multicast_OnNarrativeAnnounce(const FString& Text);
 
 	FMAOnAnnounceEvent OnAnnounceEvent;
+
+	/** Server-only entry（UMANarrativeSubsystem）：叙事特效落点推到每台机器。 */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnNarrativeFX(EMANarrativeFX Type, const TArray<FVector_NetQuantize>& Locations);
+
+	FMAOnNarrativeFXEvent OnNarrativeFXEvent;
 
 protected:
 	/** Runs on the server AND on every client when MatchState hits WaitingPostMatch —

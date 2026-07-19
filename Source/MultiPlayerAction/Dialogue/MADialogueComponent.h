@@ -2,10 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "MAGameState.h"
 #include "Templates/SubclassOf.h"
 #include "MADialogueComponent.generated.h"
 
 class ACharacter;
+class UNiagaraSystem;
 
 /**
  * 挂上即成"可对话 NPC"的数据组件 —— 名字、人设、开场白、交互半径全部 per-NPC。
@@ -44,11 +46,32 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Quest")
 	TSubclassOf<ACharacter> QuestEnemyClass;
 
+	// ---- 叙事特效（关卡实例配置；未配则对应节拍静默无特效）----
+
+	/** 剑客离场（隐入风中）。 */
+	UPROPERTY(EditAnywhere, Category = "Quest|FX")
+	TObjectPtr<UNiagaraSystem> GiverVanishFX;
+
+	/** 剑客回归。未配置时回退用 GiverVanishFX。 */
+	UPROPERTY(EditAnywhere, Category = "Quest|FX")
+	TObjectPtr<UNiagaraSystem> GiverAppearFX;
+
+	/** 敌人现身落点（任务目标与敌袭共用）。 */
+	UPROPERTY(EditAnywhere, Category = "Quest|FX")
+	TObjectPtr<UNiagaraSystem> EnemySpawnFX;
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
 	/** 头顶铭牌（名字 + 交互提示）——运行时挂到 owner 上，纯 C++ 无 BP 资产。 */
 	UPROPERTY()
 	TObjectPtr<class UWidgetComponent> NameplateComponent;
+
+	/** GameState 晚到（客户端加入时序）—— tick 轮询绑定，绑上即停 tick。 */
+	bool bBoundToGameState = false;
+
+	void HandleNarrativeFX(EMANarrativeFX Type, const TArray<FVector>& Locations);
 };
