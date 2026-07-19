@@ -55,36 +55,20 @@ FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
 		return FString::Printf(TEXT("失败：%s"), *Reject);
 	}
 
-	PS->SetActiveQuest(MAQuestRules::MakeActiveQuest(Params, NowServerTime()));
+	// 发布即 Active（任务条出现、可聊任务细节），但倒计时先不走 ——
+	// DeadlineServerTime 在关窗触发的刷怪落地时刻才填（聊天时间不吃任务时限）。
+	FMAQuestState Quest = MAQuestRules::MakeActiveQuest(Params, NowServerTime());
+	Quest.DeadlineServerTime = 0.f;
+	PS->SetActiveQuest(Quest);
 	PS->IncrementQuestsIssued();
 
-	// 剑客立刻离场观战，任务终结时回归（HandleQuestTerminal）。
-	if (AActor* NpcOwner = Npc ? Npc->GetOwner() : nullptr)
-	{
-		QuestGiverByPlayer.Add(PS, NpcOwner);
-		SetQuestGiverAway(NpcOwner, true);
-	}
-
-	// 离场与敌人现身之间停顿几秒 —— 叙事呼吸感；未来在此挂现身特效/预警圈。
-	{
-		TWeakObjectPtr<UMANarrativeSubsystem> WeakThis(this);
-		TWeakObjectPtr<AMAPlayerState> WeakPS(PS);
-		TWeakObjectPtr<const UMADialogueComponent> WeakNpc(Npc);
-		const int32 SpawnCount = Params.KillCount;
-		FTimerHandle& Handle = PendingSpawnTimers.FindOrAdd(PS);
-		GetWorld()->GetTimerManager().SetTimer(Handle,
-			FTimerDelegate::CreateLambda([WeakThis, WeakPS, WeakNpc, SpawnCount]()
-			{
-				UMANarrativeSubsystem* Self = WeakThis.Get();
-				AMAPlayerState* Player = WeakPS.Get();
-				if (Self && Player)
-				{
-					Self->PendingSpawnTimers.Remove(Player);
-					Self->SpawnQuestEnemies(Player, WeakNpc.Get(), SpawnCount);
-				}
-			}),
-			EnemySpawnDelaySeconds, false);
-	}
+	// 离场/刷怪/倒计时统一锚定"玩家关闭对话窗"（NotifyDialogueClosed）——
+	// 剑客留场陪聊到你走为止。
+	FMAPendingQuestStart Pending;
+	Pending.Npc = Npc;
+	Pending.KillCount = Params.KillCount;
+	Pending.TimeLimitSeconds = Params.TimeLimitSeconds;
+	PendingQuestStarts.Add(PS, MoveTemp(Pending));
 	OutSpokenLine = Params.QuestLine;
 	UE_LOG(LogMANarrative, Display, TEXT("已发布任务：击杀 %d，限时 %d 秒（%s）"),
 		Params.KillCount, Params.TimeLimitSeconds, *PS->GetPlayerName());
@@ -147,14 +131,69 @@ void UMANarrativeSubsystem::NotifyKill(AMAPlayerState* KillerPS)
 	}
 }
 
+void UMANarrativeSubsystem::NotifyDialogueClosed(AMAPlayerController* PC)
+{
+	AMAPlayerState* PS = PC ? PC->GetPlayerState<AMAPlayerState>() : nullptr;
+	if (!PS)
+	{
+		return;
+	}
+	FMAPendingQuestStart Pending;
+	if (!PendingQuestStarts.RemoveAndCopyValue(PS, Pending))
+	{
+		return;
+	}
+	// 任务在关窗前已终结（极端：PvP 击杀秒完成）—— 不再启动。
+	if (PS->GetActiveQuest().Phase != EMAQuestPhase::Active)
+	{
+		return;
+	}
+
+	// 此刻剑客才拂袖而去；任务终结时回归（HandleQuestTerminal）。
+	const UMADialogueComponent* Npc = Pending.Npc.Get();
+	if (AActor* NpcOwner = Npc ? Npc->GetOwner() : nullptr)
+	{
+		QuestGiverByPlayer.Add(PS, NpcOwner);
+		SetQuestGiverAway(NpcOwner, true);
+	}
+
+	// 离场与敌人现身之间停顿几秒 —— 叙事呼吸感；未来在此挂现身特效/预警圈。
+	// 刷怪落地同时给限时任务上表。
+	TWeakObjectPtr<UMANarrativeSubsystem> WeakThis(this);
+	TWeakObjectPtr<AMAPlayerState> WeakPS(PS);
+	TWeakObjectPtr<const UMADialogueComponent> WeakNpc(Pending.Npc);
+	const int32 SpawnCount = Pending.KillCount;
+	const int32 TimeLimit = Pending.TimeLimitSeconds;
+	FTimerHandle& Handle = PendingSpawnTimers.FindOrAdd(PS);
+	GetWorld()->GetTimerManager().SetTimer(Handle,
+		FTimerDelegate::CreateLambda([WeakThis, WeakPS, WeakNpc, SpawnCount, TimeLimit]()
+		{
+			UMANarrativeSubsystem* Self = WeakThis.Get();
+			AMAPlayerState* Player = WeakPS.Get();
+			if (!Self || !Player)
+			{
+				return;
+			}
+			Self->PendingSpawnTimers.Remove(Player);
+			Self->SpawnQuestEnemies(Player, WeakNpc.Get(), SpawnCount);
+			FMAQuestState& Quest = Player->GetMutableActiveQuest();
+			if (Quest.Phase == EMAQuestPhase::Active && TimeLimit > 0)
+			{
+				Quest.DeadlineServerTime = static_cast<float>(Self->NowServerTime() + TimeLimit);
+			}
+		}),
+		EnemySpawnDelaySeconds, false);
+}
+
 void UMANarrativeSubsystem::HandleQuestTerminal(AMAPlayerState* PS)
 {
-	// 撤销还没触发的延迟刷怪（延迟内任务已终结则不该再冒敌人）。
+	// 撤销还没触发的延迟刷怪与待启动记录（终结后不该再有任何东西冒出来）。
 	if (FTimerHandle* Pending = PendingSpawnTimers.Find(PS))
 	{
 		GetWorld()->GetTimerManager().ClearTimer(*Pending);
 		PendingSpawnTimers.Remove(PS);
 	}
+	PendingQuestStarts.Remove(PS);
 
 	CleanupQuestEnemies(PS); // 残余目标随任务一起谢幕（PvP 击杀也计进度，可能有剩）
 

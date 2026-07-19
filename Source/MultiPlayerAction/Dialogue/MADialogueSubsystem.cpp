@@ -195,9 +195,15 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 		S->StreamedSoFar.Reset();
 		Controller->Client_DialogueCompleted(Id);
 
-		// 关窗等收尾的会话：工具已执行、历史已无用，就地销毁。
+		// 关窗等收尾的会话：工具已执行（可能刚注册了待启动任务），
+		// 此刻窗口已经是关的 —— 立即补一次关窗通知，然后就地销毁。
 		if (S->bWindowClosed)
 		{
+			if (UMANarrativeSubsystem* Narrative = Self->GetWorld()
+				? Self->GetWorld()->GetSubsystem<UMANarrativeSubsystem>() : nullptr)
+			{
+				Narrative->NotifyDialogueClosed(Controller);
+			}
 			Self->Sessions.Remove(Controller);
 		}
 	};
@@ -253,6 +259,11 @@ void UMADialogueSubsystem::EndSession(AMAPlayerController* PC)
 	if (const TWeakObjectPtr<AMAPlayerController> Key(PC); Sessions.Contains(Key))
 	{
 		FSession& Session = Sessions[Key];
+		// 关窗时刻通知叙事系统 —— 待启动的任务从这里起跑（剑客离场/刷怪/倒计时）。
+		if (UMANarrativeSubsystem* Narrative = GetWorld()->GetSubsystem<UMANarrativeSubsystem>())
+		{
+			Narrative->NotifyDialogueClosed(PC);
+		}
 		// 关窗不打断飞行中的请求 —— 工具调用（发任务）必须执行完；
 		// 迟到的台词增量客户端会按 stale MessageId 丢弃，无副作用。
 		if (Session.ActiveRequest.IsValid() && Session.ActiveRequest->IsActive())

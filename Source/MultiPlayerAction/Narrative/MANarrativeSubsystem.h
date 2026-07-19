@@ -34,6 +34,10 @@ public:
 	/** GameMode 击杀路由：推进 killer 的任务进度，完成即发奖励。 */
 	void NotifyKill(AMAPlayerState* KillerPS);
 
+	/** 对话窗关闭：若该玩家有"待启动"的任务，此刻才让剑客离场并起 2.5s 刷怪节拍，
+	 *  限时任务的倒计时也从这里的刷怪落地时刻起算 —— 聊天时间不吃任务时限。 */
+	void NotifyDialogueClosed(AMAPlayerController* PC);
+
 	/** 对话 system prompt 用的任务状态一句话（"无任务" / "进行中 x/y 剩 z 秒"…）。 */
 	FString DescribeQuestState(const AMAPlayerController* PC) const;
 
@@ -69,4 +73,13 @@ private:
 
 	/** 延迟中的刷怪定时器；任务在延迟内终结（极端：1 杀任务被 PvP 秒完成）时撤销。 */
 	TMap<TWeakObjectPtr<AMAPlayerState>, FTimerHandle> PendingSpawnTimers;
+
+	/** 已发布但等玩家关窗才启动的任务（离场/刷怪/倒计时全部锚定关窗时刻）。 */
+	struct FMAPendingQuestStart
+	{
+		TWeakObjectPtr<const UMADialogueComponent> Npc;
+		int32 KillCount = 0;
+		int32 TimeLimitSeconds = 0;
+	};
+	TMap<TWeakObjectPtr<AMAPlayerState>, FMAPendingQuestStart> PendingQuestStarts;
 };
