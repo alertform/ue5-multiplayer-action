@@ -234,9 +234,11 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 		}
 	};
 
-	// 声明叙事工具 —— 模型可在对话中发起 give_quest，执行前过服务器校验管线。
+	// 声明叙事工具 —— 模型可在对话中发起任务/世界事件，执行前都过服务器校验管线。
 	FMALLMStreamRequest::FOverrides Overrides;
 	Overrides.Tools.Add(UMANarrativeSubsystem::GetGiveQuestToolSpec());
+	Overrides.Tools.Add(UMANarrativeSubsystem::GetTriggerRaidToolSpec());
+	Overrides.Tools.Add(UMANarrativeSubsystem::GetGrantBlessingToolSpec());
 
 	FString StartError;
 	Session->ActiveRequest = FMALLMStreamRequest::Start(Session->History, MoveTemp(Callbacks), StartError, Overrides);

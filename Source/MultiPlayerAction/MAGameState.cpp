@@ -24,6 +24,11 @@ void AMAGameState::Multicast_OnTaunt_Implementation(const FString& Text)
 	OnTauntEvent.Broadcast(Text);
 }
 
+void AMAGameState::Multicast_OnNarrativeAnnounce_Implementation(const FString& Text)
+{
+	OnAnnounceEvent.Broadcast(Text);
+}
+
 void AMAGameState::HandleMatchHasEnded()
 {
 	Super::HandleMatchHasEnded();

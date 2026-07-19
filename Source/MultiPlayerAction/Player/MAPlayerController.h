@@ -108,6 +108,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class UMAQuestTrackerWidget> QuestTrackerWidget;
 
+	/** 底部叙事字幕条（任务节拍/世界事件公告）。纯 C++ 类直建，无 BP。 */
+	UPROPERTY()
+	TObjectPtr<class UMAAnnounceWidget> AnnounceWidget;
+
 	/** Tab scoreboard / post-match results panel. Defaults to the C++ class. */
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UMAScoreboardWidget> ScoreboardWidgetClass;

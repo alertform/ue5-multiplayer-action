@@ -4,6 +4,8 @@
 #include "AbilitySystem/MAAttributeSet.h"
 #include "Dialogue/MADialogueComponent.h"
 #include "GameFramework/Character.h"
+#include "MAGameState.h"
+#include "Narrative/MAWorldEventRules.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameplayEffect.h"
@@ -13,6 +15,65 @@
 #include "Player/MAPlayerState.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMANarrative, Log, All);
+
+namespace
+{
+	// 运行时构造 transient GE（C++ 无内容资产引用）：任务奖励与全场赐福共用。
+	UGameplayEffect* MANarrative_MakeTimedMultiplierGE(const FGameplayAttribute& Attribute,
+		float Multiplier, float DurationSeconds)
+	{
+		UGameplayEffect* GE = NewObject<UGameplayEffect>(GetTransientPackage(), TEXT("GE_NarrativeBuff"));
+		GE->DurationPolicy = EGameplayEffectDurationType::HasDuration;
+		GE->DurationMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(DurationSeconds));
+		FGameplayModifierInfo Mod;
+		Mod.Attribute = Attribute;
+		Mod.ModifierOp = EGameplayModOp::Multiplicitive;
+		Mod.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(Multiplier));
+		GE->Modifiers.Add(Mod);
+		return GE;
+	}
+
+	UGameplayEffect* MANarrative_MakeInstantHealGE(float Amount)
+	{
+		UGameplayEffect* GE = NewObject<UGameplayEffect>(GetTransientPackage(), TEXT("GE_NarrativeHeal"));
+		GE->DurationPolicy = EGameplayEffectDurationType::Instant;
+		FGameplayModifierInfo Mod;
+		Mod.Attribute = UMAAttributeSet::GetHealthAttribute();
+		Mod.ModifierOp = EGameplayModOp::Additive;
+		Mod.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(Amount));
+		GE->Modifiers.Add(Mod);
+		return GE;
+	}
+
+	// 环形展开 + 半径抖动的刷怪（任务目标与敌袭共用）；返回实际刷出数并记入 OutLedger。
+	int32 MANarrative_SpawnRing(UWorld* World, const FVector& Center, TSubclassOf<ACharacter> EnemyClass,
+		int32 Count, TArray<TWeakObjectPtr<ACharacter>>& OutLedger)
+	{
+		const float AngleStep = 2.f * PI / FMath::Max(1, Count);
+		int32 Spawned = 0;
+		for (int32 i = 0; i < Count; ++i)
+		{
+			const float Angle = AngleStep * i + FMath::FRandRange(-0.3f, 0.3f);
+			const float Radius = FMath::FRandRange(700.f, 1100.f);
+			const FVector Location = Center + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 100.f);
+
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+			ACharacter* Enemy = World->SpawnActor<ACharacter>(EnemyClass, Location,
+				FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), SpawnParams);
+			if (Enemy)
+			{
+				++Spawned;
+				OutLedger.Add(Enemy);
+				if (!Enemy->GetController())
+				{
+					Enemy->SpawnDefaultController(); // 运行时刷出的 pawn 不吃 Placed-in-World 自动上脑
+				}
+			}
+		}
+		return Spawned;
+	}
+}
 
 FMALLMToolSpec UMANarrativeSubsystem::GetGiveQuestToolSpec()
 {
@@ -28,12 +89,48 @@ FMALLMToolSpec UMANarrativeSubsystem::GetGiveQuestToolSpec()
 	return Spec;
 }
 
+FMALLMToolSpec UMANarrativeSubsystem::GetTriggerRaidToolSpec()
+{
+	FMALLMToolSpec Spec;
+	Spec.Name = TEXT("trigger_raid");
+	Spec.Description = TEXT("召唤一波敌人袭击竞技场，影响场上所有人。每场最多 2 次，与其它世界事件共享冷却；对局临近结束时不可用。");
+	Spec.ParametersSchemaJson = TEXT(
+		"{\"type\":\"object\",\"properties\":{"
+		"\"enemy_count\":{\"type\":\"integer\",\"description\":\"敌人数量，1到6\"},"
+		"\"raid_line\":{\"type\":\"string\",\"description\":\"召唤敌袭时说的一句台词，不超过40字\"}"
+		"},\"required\":[\"enemy_count\",\"raid_line\"]}");
+	return Spec;
+}
+
+FMALLMToolSpec UMANarrativeSubsystem::GetGrantBlessingToolSpec()
+{
+	FMALLMToolSpec Spec;
+	Spec.Name = TEXT("grant_blessing");
+	Spec.Description = TEXT("为场上所有玩家赐福。每场最多 2 次，与其它世界事件共享冷却；对局临近结束时不可用。");
+	Spec.ParametersSchemaJson = TEXT(
+		"{\"type\":\"object\",\"properties\":{"
+		"\"blessing_type\":{\"type\":\"string\",\"enum\":[\"attack\",\"speed\",\"regen\"],"
+		"\"description\":\"attack=攻击+25%，speed=移速+25%，regen=立即回血（duration 忽略）\"},"
+		"\"duration\":{\"type\":\"integer\",\"description\":\"持续秒数，30到180\"},"
+		"\"line\":{\"type\":\"string\",\"description\":\"赐福时说的一句台词，不超过40字\"}"
+		"},\"required\":[\"blessing_type\",\"duration\",\"line\"]}");
+	return Spec;
+}
+
 FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
 	const UMADialogueComponent* Npc, const FMALLMToolCall& Call, FString& OutSpokenLine)
 {
 	OutSpokenLine.Reset();
 
-	// 防线 1：白名单。
+	// 防线 1：白名单分发。
+	if (Call.Name == TEXT("trigger_raid"))
+	{
+		return ExecuteRaid(PC, Npc, Call.ArgumentsJson, OutSpokenLine);
+	}
+	if (Call.Name == TEXT("grant_blessing"))
+	{
+		return ExecuteBlessing(Call.ArgumentsJson, OutSpokenLine);
+	}
 	if (Call.Name != TEXT("give_quest"))
 	{
 		return FString::Printf(TEXT("失败：未知工具 %s。"), *Call.Name);
@@ -116,6 +213,145 @@ void UMANarrativeSubsystem::SpawnQuestEnemies(AMAPlayerState* PS, const UMADialo
 		Spawned, Count, *Npc->QuestEnemyClass->GetName());
 }
 
+FString UMANarrativeSubsystem::ExecuteRaid(AMAPlayerController* PC,
+	const UMADialogueComponent* Npc, const FString& ArgsJson, FString& OutSpokenLine)
+{
+	MAWorldEventRules::FMAWorldEventState State;
+	State.RaidsUsed = RaidsUsed;
+	State.BlessingsUsed = BlessingsUsed;
+	State.LastEventServerTime = LastWorldEventTime;
+	State.NowServerTime = NowServerTime();
+	if (const AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr)
+	{
+		State.MatchEndServerTime = GS->MatchEndServerTime;
+	}
+
+	MAWorldEventRules::FMARaidParams Params;
+	FString Reject;
+	if (!MAWorldEventRules::ParseAndValidateRaid(ArgsJson, State, Params, Reject))
+	{
+		UE_LOG(LogMANarrative, Log, TEXT("trigger_raid 被拒：%s"), *Reject);
+		return FString::Printf(TEXT("失败：%s"), *Reject);
+	}
+
+	// 刷怪类沿用 NPC 配置；锚点优先发起对话的玩家（敌袭冲着人来），退回 NPC。
+	const AActor* Anchor = (PC && PC->GetPawn()) ? static_cast<const AActor*>(PC->GetPawn())
+		: (Npc ? Npc->GetOwner() : nullptr);
+	if (!Anchor || !Npc || !Npc->QuestEnemyClass)
+	{
+		return TEXT("失败：敌袭没有可用的刷怪配置。");
+	}
+
+	TArray<TWeakObjectPtr<ACharacter>> RaidLedger;
+	const int32 Spawned = MANarrative_SpawnRing(GetWorld(), Anchor->GetActorLocation(),
+		Npc->QuestEnemyClass, Params.EnemyCount, RaidLedger);
+
+	// 没被杀完的敌袭到点自然消散 —— 不永占"空场"竞技场。
+	TWeakObjectPtr<UMANarrativeSubsystem> WeakThis(this);
+	FTimerHandle ExpireHandle;
+	GetWorld()->GetTimerManager().SetTimer(ExpireHandle,
+		FTimerDelegate::CreateLambda([WeakThis, RaidLedger]()
+		{
+			if (!WeakThis.IsValid())
+			{
+				return;
+			}
+			int32 Removed = 0;
+			for (const TWeakObjectPtr<ACharacter>& Enemy : RaidLedger)
+			{
+				if (ACharacter* Alive = Enemy.Get())
+				{
+					Alive->Destroy();
+					++Removed;
+				}
+			}
+			if (Removed > 0)
+			{
+				UE_LOG(LogMANarrative, Display, TEXT("敌袭消散：移除 %d 个残余"), Removed);
+			}
+		}),
+		RaidLifetimeSeconds, false);
+
+	++RaidsUsed;
+	LastWorldEventTime = State.NowServerTime;
+	OutSpokenLine = Params.RaidLine;
+	Announce(FString::Printf(TEXT("敌袭！%d 名刺客现身竞技场——"), Spawned));
+	UE_LOG(LogMANarrative, Display, TEXT("敌袭触发：%d/%d 个（%s）"),
+		Spawned, Params.EnemyCount, *GetNameSafe(PC));
+	return FString::Printf(TEXT("成功：已召唤 %d 名敌人袭击竞技场，%.0f 秒后未被消灭则自行散去。"),
+		Spawned, RaidLifetimeSeconds);
+}
+
+FString UMANarrativeSubsystem::ExecuteBlessing(const FString& ArgsJson, FString& OutSpokenLine)
+{
+	MAWorldEventRules::FMAWorldEventState State;
+	State.RaidsUsed = RaidsUsed;
+	State.BlessingsUsed = BlessingsUsed;
+	State.LastEventServerTime = LastWorldEventTime;
+	State.NowServerTime = NowServerTime();
+	if (const AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr)
+	{
+		State.MatchEndServerTime = GS->MatchEndServerTime;
+	}
+
+	MAWorldEventRules::FMABlessingParams Params;
+	FString Reject;
+	if (!MAWorldEventRules::ParseAndValidateBlessing(ArgsJson, State, Params, Reject))
+	{
+		UE_LOG(LogMANarrative, Log, TEXT("grant_blessing 被拒：%s"), *Reject);
+		return FString::Printf(TEXT("失败：%s"), *Reject);
+	}
+
+	UGameplayEffect* GE = nullptr;
+	const TCHAR* BlessingName = TEXT("");
+	switch (Params.Type)
+	{
+	case MAWorldEventRules::EMABlessingType::Attack:
+		GE = MANarrative_MakeTimedMultiplierGE(UMAAttributeSet::GetAttackPowerAttribute(), 1.25f, Params.DurationSeconds);
+		BlessingName = TEXT("攻势如虹（攻击+25%）");
+		break;
+	case MAWorldEventRules::EMABlessingType::Speed:
+		GE = MANarrative_MakeTimedMultiplierGE(UMAAttributeSet::GetMoveSpeedAttribute(), 1.25f, Params.DurationSeconds);
+		BlessingName = TEXT("身轻如燕（移速+25%）");
+		break;
+	case MAWorldEventRules::EMABlessingType::Regen:
+		GE = MANarrative_MakeInstantHealGE(50.f);
+		BlessingName = TEXT("气血调息（立即回复）");
+		break;
+	}
+
+	int32 Blessed = 0;
+	if (const AGameStateBase* GS = GetWorld() ? GetWorld()->GetGameState() : nullptr)
+	{
+		for (APlayerState* PS : GS->PlayerArray)
+		{
+			const AMAPlayerState* MPS = Cast<AMAPlayerState>(PS);
+			UAbilitySystemComponent* ASC = MPS ? MPS->GetAbilitySystemComponent() : nullptr;
+			if (ASC && GE)
+			{
+				FGameplayEffectContextHandle Ctx = ASC->MakeEffectContext();
+				ASC->ApplyGameplayEffectToSelf(GE, 1.f, Ctx);
+				++Blessed;
+			}
+		}
+	}
+
+	++BlessingsUsed;
+	LastWorldEventTime = State.NowServerTime;
+	OutSpokenLine = Params.Line;
+	Announce(FString::Printf(TEXT("剑客赐福全场：%s"), BlessingName));
+	UE_LOG(LogMANarrative, Display, TEXT("赐福生效：%s，覆盖 %d 名玩家"), BlessingName, Blessed);
+	return FString::Printf(TEXT("成功：全场 %d 名玩家获得%s。"), Blessed, BlessingName);
+}
+
+void UMANarrativeSubsystem::Announce(const FString& Text)
+{
+	if (AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr)
+	{
+		GS->Multicast_OnNarrativeAnnounce(Text);
+	}
+}
+
 void UMANarrativeSubsystem::NotifyKill(AMAPlayerState* KillerPS)
 {
 	if (!KillerPS)
@@ -127,6 +363,7 @@ void UMANarrativeSubsystem::NotifyKill(AMAPlayerState* KillerPS)
 	if (Result == MAQuestRules::EMAQuestKillResult::JustCompleted)
 	{
 		GrantQuestReward(KillerPS);
+		Announce(FString::Printf(TEXT("「%s」完成了剑客的委托，奖励已发放。"), *KillerPS->GetPlayerName()));
 		HandleQuestTerminal(KillerPS);
 	}
 }
@@ -155,6 +392,7 @@ void UMANarrativeSubsystem::NotifyDialogueClosed(AMAPlayerController* PC)
 	{
 		QuestGiverByPlayer.Add(PS, NpcOwner);
 		SetQuestGiverAway(NpcOwner, true);
+		Announce(TEXT("云游剑客隐入风中，猎物将至……"));
 	}
 
 	// 离场与敌人现身之间停顿几秒 —— 叙事呼吸感；未来在此挂现身特效/预警圈。
@@ -181,6 +419,11 @@ void UMANarrativeSubsystem::NotifyDialogueClosed(AMAPlayerController* PC)
 			{
 				Quest.DeadlineServerTime = static_cast<float>(Self->NowServerTime() + TimeLimit);
 			}
+			Self->Announce(TimeLimit > 0
+				? FString::Printf(TEXT("「%s」的猎物现身：%d 个目标，限时 %d 秒！"),
+					*Player->GetPlayerName(), SpawnCount, TimeLimit)
+				: FString::Printf(TEXT("「%s」的猎物现身：%d 个目标！"),
+					*Player->GetPlayerName(), SpawnCount));
 		}),
 		EnemySpawnDelaySeconds, false);
 }
@@ -211,6 +454,10 @@ void UMANarrativeSubsystem::HandleQuestTerminal(AMAPlayerState* PS)
 				if (Self && NpcOwner)
 				{
 					Self->SetQuestGiverAway(NpcOwner, false);
+					if (!NpcOwner->IsHidden())
+					{
+						Self->Announce(TEXT("云游剑客归来了。"));
+					}
 				}
 			}),
 			GiverReturnDelaySeconds, false);
@@ -300,6 +547,7 @@ void UMANarrativeSubsystem::Tick(float DeltaTime)
 			{
 				if (MAQuestRules::CheckExpired(MPS->GetMutableActiveQuest(), NowServerTime()))
 				{
+					Announce(FString::Printf(TEXT("「%s」的委托超时了……"), *MPS->GetPlayerName()));
 					HandleQuestTerminal(MPS); // 超时：清场 + 剑客回归
 				}
 			}

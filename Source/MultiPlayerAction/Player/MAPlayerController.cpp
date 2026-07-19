@@ -4,6 +4,7 @@
 #include "UI/MAUserWidget.h"
 #include "UI/MAMatchStatusWidget.h"
 #include "UI/MAQuestTrackerWidget.h"
+#include "UI/MAAnnounceWidget.h"
 #include "UI/MAScoreboardWidget.h"
 #include "UI/MAKillFeedWidget.h"
 #include "UI/MADialogueWidget.h"
@@ -425,6 +426,14 @@ void AMAPlayerController::EnsureHUDInitialized()
 		if (QuestTrackerWidget)
 		{
 			QuestTrackerWidget->AddToViewport(1);
+		}
+	}
+	if (!AnnounceWidget)
+	{
+		AnnounceWidget = CreateWidget<UMAAnnounceWidget>(this, UMAAnnounceWidget::StaticClass());
+		if (AnnounceWidget)
+		{
+			AnnounceWidget->AddToViewport(3);
 		}
 	}
 	if (!ScoreboardWidget && ScoreboardWidgetClass)

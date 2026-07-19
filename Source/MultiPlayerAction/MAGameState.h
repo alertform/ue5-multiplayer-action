@@ -11,6 +11,9 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(FMAOnKillEvent, const FString& /*KillerName
 /** 敌方阵营喊话（LLM 战术指挥官的 taunt）在每台机器上的本地分发。 */
 DECLARE_MULTICAST_DELEGATE_OneParam(FMAOnTauntEvent, const FString& /*Text*/);
 
+/** 叙事公告（任务节拍/世界事件）在每台机器上的本地分发 —— 底部字幕条消费。 */
+DECLARE_MULTICAST_DELEGATE_OneParam(FMAOnAnnounceEvent, const FString& /*Text*/);
+
 /**
  * Match-scoped replicated state for the deathmatch loop. The engine MatchState machine
  * (AGameMode/AGameState) already drives the phases and replicates them — this class only
@@ -57,6 +60,12 @@ public:
 	void Multicast_OnTaunt(const FString& Text);
 
 	FMAOnTauntEvent OnTauntEvent;
+
+	/** Server-only entry（UMANarrativeSubsystem）：叙事公告推到每台机器的字幕条。 */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnNarrativeAnnounce(const FString& Text);
+
+	FMAOnAnnounceEvent OnAnnounceEvent;
 
 protected:
 	/** Runs on the server AND on every client when MatchState hits WaitingPostMatch —

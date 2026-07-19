@@ -26,6 +26,10 @@ public:
 	/** give_quest 的 OpenAI 工具声明（schema 与 MAQuestRules 钳制范围一致）。 */
 	static FMALLMToolSpec GetGiveQuestToolSpec();
 
+	/** trigger_raid / grant_blessing 的工具声明（schema 与 MAWorldEventRules 一致）。 */
+	static FMALLMToolSpec GetTriggerRaidToolSpec();
+	static FMALLMToolSpec GetGrantBlessingToolSpec();
+
 	/** 执行一个工具调用；返回回填给模型的结果文本。接受 give_quest 时 OutSpokenLine=quest_line。
 	 *  Npc 提供刷怪配置（QuestEnemyClass）与刷怪锚点位置，可为 null（不刷怪只发任务）。 */
 	FString ExecuteToolCall(AMAPlayerController* PC, const UMADialogueComponent* Npc,
@@ -46,6 +50,13 @@ public:
 	virtual TStatId GetStatId() const override;
 
 private:
+	/** 全场字幕公告（server → GameState multicast → 每台机器的字幕条）。 */
+	void Announce(const FString& Text);
+
+	FString ExecuteRaid(AMAPlayerController* PC, const UMADialogueComponent* Npc,
+		const FString& ArgsJson, FString& OutSpokenLine);
+	FString ExecuteBlessing(const FString& ArgsJson, FString& OutSpokenLine);
+
 	void GrantQuestReward(AMAPlayerState* PS);
 	/** 发任务时绕锚点环形刷出任务目标（SpawnDefaultController 保证 AI 上脑），并记账以便清场。 */
 	void SpawnQuestEnemies(AMAPlayerState* PS, const UMADialogueComponent* Npc, int32 Count);
@@ -82,4 +93,12 @@ private:
 		int32 TimeLimitSeconds = 0;
 	};
 	TMap<TWeakObjectPtr<AMAPlayerState>, FMAPendingQuestStart> PendingQuestStarts;
+
+	// ---- 世界事件（trigger_raid / grant_blessing）对局账本 ----
+	int32 RaidsUsed = 0;
+	int32 BlessingsUsed = 0;
+	double LastWorldEventTime = -1.0e9;
+
+	/** 敌袭刷怪的自然消散时限（没被杀完也不永占竞技场）。 */
+	static constexpr float RaidLifetimeSeconds = 90.f;
 };
