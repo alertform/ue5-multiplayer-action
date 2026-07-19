@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Config/MAConfigTypes.h"
 #include "MALuaAbilityConfig.generated.h"
@@ -37,4 +38,10 @@ public:
 private:
 	TMap<FName, FMAConfigTable> Cache;
 	IConsoleCommand* ReloadCmd = nullptr;
+
+#if !UE_BUILD_SHIPPING
+	/** 存盘即生效：1s 轮询文件时间戳，变了自动 Reload（Shipping 不带——发行包配置定死）。 */
+	FTSTicker::FDelegateHandle FileWatchTicker;
+	FDateTime LastConfigTimestamp;
+#endif
 };

@@ -1,6 +1,8 @@
 #include "Config/MALuaAbilityConfig.h"
 #include "Config/MALuaBridge.h"
 #include "Misc/Paths.h"
+#include "Containers/Ticker.h"
+#include "HAL/FileManager.h"
 #include "HAL/IConsoleManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMALuaConfig, Log, All);
@@ -22,10 +24,36 @@ void UMALuaAbilityConfig::Initialize(FSubsystemCollectionBase& Collection)
 		TEXT("Reload Content/Script/AbilityConfig.lua into the ability config cache."),
 		FConsoleCommandDelegate::CreateWeakLambda(this, [this]() { Reload(); }),
 		ECVF_Default);
+
+#if !UE_BUILD_SHIPPING
+	// 存盘即生效：秒级轮询时间戳（一次 stat 调用，成本可忽略），变了自动重载。
+	// 用 FTSTicker 而非 Tick —— GameInstanceSubsystem 本身不带 Tick。
+	LastConfigTimestamp = IFileManager::Get().GetTimeStamp(*DefaultConfigPath());
+	FileWatchTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+		[this](float) -> bool
+		{
+			const FDateTime Stamp = IFileManager::Get().GetTimeStamp(*DefaultConfigPath());
+			if (Stamp != LastConfigTimestamp)
+			{
+				LastConfigTimestamp = Stamp;
+				const bool bOk = Reload();
+				UE_LOG(LogMALuaConfig, Display, TEXT("AbilityConfig.lua 已保存 → 自动热重载%s"),
+					bOk ? TEXT("成功") : TEXT("失败（语法错误？缓存保留上一份）"));
+			}
+			return true; // 持续轮询
+		}), 1.f);
+#endif
 }
 
 void UMALuaAbilityConfig::Deinitialize()
 {
+#if !UE_BUILD_SHIPPING
+	if (FileWatchTicker.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(FileWatchTicker);
+		FileWatchTicker.Reset();
+	}
+#endif
 	if (ReloadCmd)
 	{
 		IConsoleManager::Get().UnregisterConsoleObject(ReloadCmd);
