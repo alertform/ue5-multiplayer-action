@@ -114,15 +114,20 @@ void AMAPlayerController::OnInteractPressed()
 		DialogueWidget->AddToViewport(20);
 	}
 
-	// 本地立即开窗、上开场白 —— 不等 server 往返。任务状态已复制到本端，
-	// 开场白按状态本地计算（与服务器 StartSession 写进历史的完全一致）。
+	// 本地立即开窗、上开场白 —— 不等 server 往返。任务/好感状态已复制到本端，
+	// 开场白与标题按状态本地计算（与服务器 StartSession 写进历史的完全一致）。
 	FString Greeting = Npc->Greeting;
+	FString Title = Npc->NpcName;
 	if (const AMAPlayerState* PS = GetPlayerState<AMAPlayerState>())
 	{
 		Greeting = MAQuestRules::MakeReturnGreeting(PS->GetActiveQuest(), Npc->Greeting);
+		if (PS->GetNpcFavor() != 0)
+		{
+			Title = FString::Printf(TEXT("%s（好感 %+d）"), *Npc->NpcName, PS->GetNpcFavor());
+		}
 	}
 	DialogueWidget->SetVisibility(ESlateVisibility::Visible);
-	DialogueWidget->OpenFor(Npc->NpcName, Greeting);
+	DialogueWidget->OpenFor(Title, Greeting);
 	bDialogueOpen = true;
 	ClientDialogueMessageId = INDEX_NONE;
 

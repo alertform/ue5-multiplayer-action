@@ -5,6 +5,7 @@
 #include "Dialogue/MADialogueComponent.h"
 #include "GameFramework/Character.h"
 #include "MAGameState.h"
+#include "Narrative/MAFavorRules.h"
 #include "Narrative/MAWorldEventRules.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/GameStateBase.h"
@@ -117,10 +118,38 @@ FMALLMToolSpec UMANarrativeSubsystem::GetGrantBlessingToolSpec()
 	return Spec;
 }
 
+FMALLMToolSpec UMANarrativeSubsystem::GetAdjustFavorToolSpec()
+{
+	FMALLMToolSpec Spec;
+	Spec.Name = TEXT("adjust_favor");
+	Spec.Description = TEXT("根据对话表现调整你对这名玩家的好感度。真诚/有礼/有趣加分，无礼/挑衅减分。好感高会解锁赐福与情报，好感太低你会拒绝一切帮助。");
+	Spec.ParametersSchemaJson = TEXT(
+		"{\"type\":\"object\",\"properties\":{"
+		"\"delta\":{\"type\":\"integer\",\"description\":\"好感变化，-2 到 2，不能为 0\"},"
+		"\"reason\":{\"type\":\"string\",\"description\":\"一句话理由\"}"
+		"},\"required\":[\"delta\",\"reason\"]}");
+	return Spec;
+}
+
 FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
 	const UMADialogueComponent* Npc, const FMALLMToolCall& Call, FString& OutSpokenLine)
 {
 	OutSpokenLine.Reset();
+
+	AMAPlayerState* CallerPS = PC ? PC->GetPlayerState<AMAPlayerState>() : nullptr;
+
+	// adjust_favor 永远可用 —— 被翻脸的玩家得有道歉挽回的通路。
+	if (Call.Name == TEXT("adjust_favor"))
+	{
+		return CallerPS ? ExecuteAdjustFavor(CallerPS, Call.ArgumentsJson)
+			: TEXT("失败：找不到玩家状态。");
+	}
+
+	// 防线 0：好感封杀线 —— 剑客翻脸后拒绝执行任何实质动作。
+	if (CallerPS && MAFavorRules::IsMuted(CallerPS->GetNpcFavor()))
+	{
+		return TEXT("失败：你对此人好感过低，已拒绝为其效力（对方需先挽回好感）。");
+	}
 
 	// 防线 1：白名单分发。
 	if (Call.Name == TEXT("trigger_raid"))
@@ -129,6 +158,12 @@ FString UMANarrativeSubsystem::ExecuteToolCall(AMAPlayerController* PC,
 	}
 	if (Call.Name == TEXT("grant_blessing"))
 	{
+		// 赐福是信任的馈赠 —— 好感门槛。
+		if (CallerPS && !MAFavorRules::IsTrusted(CallerPS->GetNpcFavor()))
+		{
+			return FString::Printf(TEXT("失败：好感不足（当前 %d，需要 ≥%d），赐福只给信得过的人。"),
+				CallerPS->GetNpcFavor(), MAFavorRules::TrustGate);
+		}
 		return ExecuteBlessing(Call.ArgumentsJson, OutSpokenLine);
 	}
 	if (Call.Name != TEXT("give_quest"))
@@ -342,6 +377,64 @@ FString UMANarrativeSubsystem::ExecuteBlessing(const FString& ArgsJson, FString&
 	Announce(FString::Printf(TEXT("剑客赐福全场：%s"), BlessingName));
 	UE_LOG(LogMANarrative, Display, TEXT("赐福生效：%s，覆盖 %d 名玩家"), BlessingName, Blessed);
 	return FString::Printf(TEXT("成功：全场 %d 名玩家获得%s。"), Blessed, BlessingName);
+}
+
+FString UMANarrativeSubsystem::ExecuteAdjustFavor(AMAPlayerState* PS, const FString& ArgsJson)
+{
+	MAFavorRules::FMAAdjustFavorParams Params;
+	FString Reject;
+	if (!MAFavorRules::ParseAndValidateAdjustFavor(ArgsJson, Params, Reject))
+	{
+		UE_LOG(LogMANarrative, Log, TEXT("adjust_favor 被拒：%s"), *Reject);
+		return FString::Printf(TEXT("失败：%s"), *Reject);
+	}
+	const int32 NewFavor = MAFavorRules::ApplyDelta(PS->GetNpcFavor(), Params.Delta);
+	PS->SetNpcFavor(NewFavor);
+	UE_LOG(LogMANarrative, Display, TEXT("好感调整 %+d（%s）→ %d：%s"),
+		Params.Delta, *PS->GetPlayerName(), NewFavor, *Params.Reason);
+	return FString::Printf(TEXT("成功：好感 %+d，当前 %d（%s）。"),
+		Params.Delta, NewFavor, *MAFavorRules::DescribeAttitude(NewFavor));
+}
+
+FString UMANarrativeSubsystem::BuildNarrativeContext(const AMAPlayerController* PC) const
+{
+	const AMAPlayerState* PS = PC ? PC->GetPlayerState<AMAPlayerState>() : nullptr;
+	if (!PS)
+	{
+		return FString();
+	}
+	const int32 Favor = PS->GetNpcFavor();
+	FString Context = FString::Printf(TEXT("\n当前玩家任务状态：%s。你对此玩家好感度 %d（%s）。"),
+		*DescribeQuestState(PC), Favor, *MAFavorRules::DescribeAttitude(Favor));
+
+	// 好感达标才把真实对局数据递给模型 —— 情报是信任的奖励，不做成工具，
+	// 模型拿到数据后在台词里自然转述。
+	if (MAFavorRules::IsTrusted(Favor))
+	{
+		const AMAGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMAGameState>() : nullptr;
+		if (GS)
+		{
+			const AMAPlayerState* Leader = nullptr;
+			for (APlayerState* Other : GS->PlayerArray)
+			{
+				const AMAPlayerState* MPS = Cast<AMAPlayerState>(Other);
+				if (MPS && (!Leader || MPS->GetKills() > Leader->GetKills()))
+				{
+					Leader = MPS;
+				}
+			}
+			const int32 Remain = GS->MatchEndServerTime > 0.f
+				? FMath::Max(0, FMath::FloorToInt(GS->MatchEndServerTime - NowServerTime())) : -1;
+			Context += FString::Printf(TEXT("你掌握的对局情报（可向他透露）：领先者是「%s」（%d 杀，目标 %d 杀）；"
+				"该玩家自己 %d 杀 %d 死%s。"),
+				Leader ? *Leader->GetPlayerName() : TEXT("无"),
+				Leader ? Leader->GetKills() : 0,
+				GS->KillTarget,
+				PS->GetKills(), PS->GetDeaths(),
+				Remain >= 0 ? *FString::Printf(TEXT("；对局还剩约 %d 秒"), Remain) : TEXT(""));
+		}
+	}
+	return Context;
 }
 
 void UMANarrativeSubsystem::Announce(const FString& Text)

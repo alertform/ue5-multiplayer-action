@@ -30,6 +30,12 @@ public:
 	static FMALLMToolSpec GetTriggerRaidToolSpec();
 	static FMALLMToolSpec GetGrantBlessingToolSpec();
 
+	/** adjust_favor 的工具声明（schema 与 MAFavorRules 一致）。 */
+	static FMALLMToolSpec GetAdjustFavorToolSpec();
+
+	/** system prompt 的叙事上下文：任务状态 + 好感态度 + （好感达标时）真实对局情报。 */
+	FString BuildNarrativeContext(const AMAPlayerController* PC) const;
+
 	/** 执行一个工具调用；返回回填给模型的结果文本。接受 give_quest 时 OutSpokenLine=quest_line。
 	 *  Npc 提供刷怪配置（QuestEnemyClass）与刷怪锚点位置，可为 null（不刷怪只发任务）。 */
 	FString ExecuteToolCall(AMAPlayerController* PC, const UMADialogueComponent* Npc,
@@ -56,6 +62,7 @@ private:
 	FString ExecuteRaid(AMAPlayerController* PC, const UMADialogueComponent* Npc,
 		const FString& ArgsJson, FString& OutSpokenLine);
 	FString ExecuteBlessing(const FString& ArgsJson, FString& OutSpokenLine);
+	FString ExecuteAdjustFavor(AMAPlayerState* PS, const FString& ArgsJson);
 
 	void GrantQuestReward(AMAPlayerState* PS);
 	/** 发任务时绕锚点环形刷出任务目标（SpawnDefaultController 保证 AI 上脑），并记账以便清场。 */

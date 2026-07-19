@@ -46,6 +46,11 @@ public:
 	int32 GetQuestsIssued() const { return QuestsIssued; }
 	void IncrementQuestsIssued() { ++QuestsIssued; }
 
+	/** 对剑客的好感度（复制；对话窗标题展示）。服务器经 SetNpcFavor 写。 */
+	UFUNCTION(BlueprintPure, Category = "Narrative")
+	int32 GetNpcFavor() const { return NpcFavor; }
+	void SetNpcFavor(int32 InFavor) { NpcFavor = InFavor; }
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
@@ -67,6 +72,10 @@ protected:
 	/** 叙事任务状态；同 Kills/Deaths，对局重启随 PlayerState 重建自然清零。 */
 	UPROPERTY(Replicated)
 	FMAQuestState ActiveQuest;
+
+	/** 对剑客的好感度（MAFavorRules 范围钳制；局内即弃）。 */
+	UPROPERTY(Replicated)
+	int32 NpcFavor = 0;
 
 private:
 	bool bStartupAbilitiesGranted = false;

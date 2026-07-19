@@ -106,9 +106,9 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 		FString SystemPrompt = BuildSystemPrompt(*Npc);
 		if (UMANarrativeSubsystem* Narrative = GetWorld()->GetSubsystem<UMANarrativeSubsystem>())
 		{
-			SystemPrompt += FString::Printf(TEXT("\n当前玩家任务状态：%s。"
-				"答应给玩家任务时必须调用 give_quest 工具正式发布，不得只在口头承诺。"),
-				*Narrative->DescribeQuestState(PC));
+			SystemPrompt += Narrative->BuildNarrativeContext(PC);
+			SystemPrompt += TEXT("答应给玩家任务/敌袭/赐福时必须调用对应工具正式执行，不得只在口头承诺；"
+				"根据对话表现随时用 adjust_favor 调整好感。");
 		}
 		Session->History[0].Content = MoveTemp(SystemPrompt);
 	}
@@ -239,6 +239,7 @@ void UMADialogueSubsystem::SendPlayerMessage(AMAPlayerController* PC, const FStr
 	Overrides.Tools.Add(UMANarrativeSubsystem::GetGiveQuestToolSpec());
 	Overrides.Tools.Add(UMANarrativeSubsystem::GetTriggerRaidToolSpec());
 	Overrides.Tools.Add(UMANarrativeSubsystem::GetGrantBlessingToolSpec());
+	Overrides.Tools.Add(UMANarrativeSubsystem::GetAdjustFavorToolSpec());
 
 	FString StartError;
 	Session->ActiveRequest = FMALLMStreamRequest::Start(Session->History, MoveTemp(Callbacks), StartError, Overrides);
