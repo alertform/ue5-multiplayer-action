@@ -66,4 +66,5 @@ namespace MAGameplayTags
 	// Dash slash — Motion-Warped root-motion katana dash. Asset tag + cooldown.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Melee_DashSlash);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_DashSlash);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_DamageMultiplier);
 }

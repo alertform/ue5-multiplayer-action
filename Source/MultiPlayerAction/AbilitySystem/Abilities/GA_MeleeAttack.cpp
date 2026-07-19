@@ -233,6 +233,9 @@ void UGA_MeleeAttack::PerformHitTrace(const FGameplayAbilityActorInfo* ActorInfo
 	}
 	// Sweep/filter/apply shared with GA_DashSlash — see MAMeleeHitOps.
 	const FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffect, GetAbilityLevel());
+	// lua 可调的每技能伤害系数（缺键=1.0 原伤害）；ExecCalc 乘进最终公式。
+	SpecHandle.Data->SetSetByCallerMagnitude(MAGameplayTags::Data_DamageMultiplier,
+		ReadConfigFloat(TEXT("DamageMultiplier"), 1.f));
 	MAMeleeHitOps::SweepAndApplyMeleeHit(Avatar, SourceASC, SpecHandle,
 		ReadConfigFloat(TEXT("TraceDistance"), TraceDistance),
 		ReadConfigFloat(TEXT("TraceRadius"), TraceRadius));

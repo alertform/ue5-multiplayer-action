@@ -9,11 +9,13 @@ return {
         MaxLungeDistanceCm = 350,
         StopDistanceCm   = 120,
         NoTargetDashCm   = 0,   -- 0 = 落空时让原生 1.4-3.4m 步进原样播放
+        DamageMultiplier = 1.0, -- 伤害 = AttackPower × 此系数 × 护甲/格挡减免
     },
     Fireball = {
         ExplosionRadius  = 300,
         MontagePlayRate  = 1.0,
         MuzzleSocketName = "hand_r",
+        DamageMultiplier = 1.0,
     },
     DashSlash = {
         ConeHalfAngleDeg   = 35,
@@ -22,5 +24,6 @@ return {
         NoTargetDashCm     = 250,
         TraceDistance      = 180,
         TraceRadius        = 60,
+        DamageMultiplier   = 1.0,
     },
 }
