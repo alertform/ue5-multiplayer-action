@@ -170,7 +170,7 @@ void FMALLMStreamRequest::ProcessBytes(TArray<uint8> Bytes)
 				UE_LOG(LogMALLM, Log, TEXT("token 用量：prompt=%d completion=%d finish=%s"),
 					UsagePromptTokens, UsageCompletionTokens, *LastFinishReason);
 			}
-			if (Accumulated.IsEmpty())
+			if (Accumulated.IsEmpty() && !ToolCallAggregator.HasCalls())
 			{
 				UE_LOG(LogMALLM, Warning, TEXT("流结束但正文为空：finish=%s（length=输出预算被耗尽，思考型模型需更大 max_tokens）"),
 					*LastFinishReason);

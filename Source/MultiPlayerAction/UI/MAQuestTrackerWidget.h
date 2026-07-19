@@ -6,6 +6,7 @@
 #include "MAQuestTrackerWidget.generated.h"
 
 class UTextBlock;
+class UVerticalBox;
 
 /**
  * 右侧任务条：NativeTick 轮询本地 PlayerState 的复制任务状态（项目 UI 惯例：轮询无事件）。
@@ -21,6 +22,11 @@ protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+	/** 内容盒 —— 显隐开关打在它身上。根必须保持可见：Collapsed 的根不再 tick，
+	 *  一旦收起就永远等不到"任务到达"那一帧（首测踩坑实录）。 */
+	UPROPERTY()
+	TObjectPtr<UVerticalBox> Stack;
+
 	UPROPERTY()
 	TObjectPtr<UTextBlock> TitleText;
 

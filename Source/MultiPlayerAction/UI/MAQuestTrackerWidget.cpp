@@ -25,7 +25,7 @@ void UMAQuestTrackerWidget::NativeOnInitialized()
 	UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
 	WidgetTree->RootWidget = Root;
 
-	UVerticalBox* Stack = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("Stack"));
+	Stack = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("Stack"));
 	UCanvasPanelSlot* StackSlot = Root->AddChildToCanvas(Stack);
 	StackSlot->SetAnchors(FAnchors(1.f, 0.35f));
 	StackSlot->SetAlignment(FVector2D(1.f, 0.f));
@@ -56,7 +56,8 @@ void UMAQuestTrackerWidget::NativeOnInitialized()
 		ProgressSlot->SetPadding(FMargin(0.f, 2.f, 0.f, 0.f));
 	}
 
-	SetVisibility(ESlateVisibility::Collapsed);
+	// 收内容盒，不收根 —— 根 Collapsed 会停掉 NativeTick，状态永远无法再展开。
+	Stack->SetVisibility(ESlateVisibility::Collapsed);
 }
 
 void UMAQuestTrackerWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -83,7 +84,7 @@ void UMAQuestTrackerWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 	{
 	case EMAQuestPhase::Active:
 	{
-		SetVisibility(ESlateVisibility::HitTestInvisible);
+		Stack->SetVisibility(ESlateVisibility::HitTestInvisible);
 		FString Line = FString::Printf(TEXT("击杀 %d/%d"), Q.Progress, Q.TargetKills);
 		if (Q.DeadlineServerTime > 0.f)
 		{
@@ -100,17 +101,17 @@ void UMAQuestTrackerWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 		if (TerminalHoldSeconds > 0.f)
 		{
 			TerminalHoldSeconds -= InDeltaTime;
-			SetVisibility(ESlateVisibility::HitTestInvisible);
+			Stack->SetVisibility(ESlateVisibility::HitTestInvisible);
 			ProgressText->SetText(FText::FromString(Q.Phase == EMAQuestPhase::Completed
 				? TEXT("任务完成！奖励已发放") : TEXT("任务超时失败")));
 		}
 		else
 		{
-			SetVisibility(ESlateVisibility::Collapsed);
+			Stack->SetVisibility(ESlateVisibility::Collapsed);
 		}
 		break;
 	default:
-		SetVisibility(ESlateVisibility::Collapsed);
+		Stack->SetVisibility(ESlateVisibility::Collapsed);
 		break;
 	}
 }
