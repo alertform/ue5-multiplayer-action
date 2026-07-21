@@ -35,6 +35,9 @@ private:
 	TObjectPtr<USizeBox> Frame;
 
 	UPROPERTY()
+	TObjectPtr<UBorder> EdgeBorder;
+
+	UPROPERTY()
 	TObjectPtr<UCanvasPanel> ClipPanel;
 
 	UPROPERTY()
@@ -52,6 +55,11 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AMAMapDefinition> MapDef;
+
+	/** 材质驱动模式（MapDef 挂了 MinimapMaterial 时启用）：UV 窗口/旋转/圆形遮罩全在
+	 *  材质里做，widget 只喂 MID 参数（CenterU/V、ViewScale、Angle）。空则回退方形裁剪。 */
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> MapMID;
 
 	/** 图标数据源（节流扫描）：敌人 pawn 与对话 NPC。 */
 	TArray<TWeakObjectPtr<AActor>> EnemySources;

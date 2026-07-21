@@ -5,6 +5,7 @@
 #include "MAMapDefinition.generated.h"
 
 class UBoxComponent;
+class UMaterialInterface;
 class UTexture2D;
 
 /**
@@ -27,6 +28,7 @@ public:
 	FVector2D WorldToMapUV(const FVector& WorldPos) const;
 
 	UTexture2D* GetMinimapTexture() const { return MinimapTexture; }
+	UMaterialInterface* GetMinimapMaterial() const { return MinimapMaterial; }
 
 	/** 覆盖范围世界边长（方形）。 */
 	float GetWorldSpan() const;
@@ -39,4 +41,10 @@ protected:
 	/** 烘焙的顶视图。关卡实例上指定，C++ 不持内容引用。 */
 	UPROPERTY(EditAnywhere, Category = "Minimap")
 	TObjectPtr<UTexture2D> MinimapTexture;
+
+	/** 小地图显示材质（M_MAMinimap：UV 窗口/旋转/圆形遮罩/描环全在材质里）。
+	 *  未指定时 widget 回退方形裁剪模式。参数约定：MapTexture / CenterU / CenterV /
+	 *  ViewScale / Angle。 */
+	UPROPERTY(EditAnywhere, Category = "Minimap")
+	TObjectPtr<UMaterialInterface> MinimapMaterial;
 };

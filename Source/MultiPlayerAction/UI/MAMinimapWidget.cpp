@@ -13,6 +13,8 @@
 #include "Components/TextBlock.h"
 #include "Dialogue/MADialogueComponent.h"
 #include "EngineUtils.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Styling/CoreStyle.h"
 #include "UObject/UObjectIterator.h"
 #include "World/MAMapDefinition.h"
@@ -44,13 +46,13 @@ void UMAMinimapWidget::NativeOnInitialized()
 	FrameSlot->SetAutoSize(true);
 	FrameSlot->SetPosition(FVector2D(-24.f, -24.f));
 
-	UBorder* Edge = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Edge"));
-	Edge->SetBrushColor(FLinearColor(0.f, 0.f, 0.f, 0.55f));
-	Edge->SetPadding(FMargin(2.f));
-	Frame->AddChild(Edge);
+	EdgeBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Edge"));
+	EdgeBorder->SetBrushColor(FLinearColor(0.f, 0.f, 0.f, 0.55f));
+	EdgeBorder->SetPadding(FMargin(2.f));
+	Frame->AddChild(EdgeBorder);
 
 	UOverlay* Stack = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("Stack"));
-	Edge->AddChild(Stack);
+	EdgeBorder->AddChild(Stack);
 
 	ClipPanel = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("ClipPanel"));
 	ClipPanel->SetClipping(EWidgetClipping::ClipToBounds);
@@ -140,7 +142,24 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 			}
 			if (MapDef.IsValid() && MapDef->GetMinimapTexture())
 			{
-				MapImage->SetBrushFromTexture(MapDef->GetMinimapTexture());
+				if (UMaterialInterface* Mat = MapDef->GetMinimapMaterial())
+				{
+					// 材质驱动：UV 窗口/旋转/圆形遮罩在材质里，widget 只喂参数。
+					MapMID = UMaterialInstanceDynamic::Create(Mat, this);
+					MapMID->SetTextureParameterValue(TEXT("MapTexture"), MapDef->GetMinimapTexture());
+					MapImage->SetBrushFromMaterial(MapMID);
+					if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(MapImage->Slot))
+					{
+						S->SetPosition(FVector2D::ZeroVector);
+						S->SetSize(FVector2D(GMinimapWindowPx, GMinimapWindowPx));
+					}
+					MapImage->SetRenderTransformAngle(0.f);
+					EdgeBorder->SetBrushColor(FLinearColor::Transparent);   // 圆环框由材质画
+				}
+				else
+				{
+					MapImage->SetBrushFromTexture(MapDef->GetMinimapTexture());
+				}
 			}
 		}
 	}
@@ -161,14 +180,25 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	const float Yaw = GetOwningPlayer() ? static_cast<float>(GetOwningPlayer()->GetControlRotation().Yaw) : 0.f;
 	const float Half = GMinimapWindowPx * 0.5f;
 
-	// 底图:玩家 UV 点平移到窗口中心,再绕该点旋转(玩家朝向恒朝上)。
-	if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(MapImage->Slot))
+	if (MapMID)
 	{
-		S->SetSize(FVector2D(DrawnPx, DrawnPx));
-		S->SetPosition(FVector2D(Half - PlayerUV.X * DrawnPx, Half - PlayerUV.Y * DrawnPx));
+		// 材质驱动:采样端旋转与显示端方向相反,角度取 +Yaw(与图标层的 -Yaw 互补)。
+		MapMID->SetScalarParameterValue(TEXT("CenterU"), PlayerUV.X);
+		MapMID->SetScalarParameterValue(TEXT("CenterV"), PlayerUV.Y);
+		MapMID->SetScalarParameterValue(TEXT("ViewScale"), ViewSpan / WorldSpan);
+		MapMID->SetScalarParameterValue(TEXT("Angle"), FMath::DegreesToRadians(Yaw));
 	}
-	MapImage->SetRenderTransformPivot(PlayerUV);
-	MapImage->SetRenderTransformAngle(-Yaw);
+	else
+	{
+		// 方形回退:玩家 UV 点平移到窗口中心,再绕该点旋转(玩家朝向恒朝上)。
+		if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(MapImage->Slot))
+		{
+			S->SetSize(FVector2D(DrawnPx, DrawnPx));
+			S->SetPosition(FVector2D(Half - PlayerUV.X * DrawnPx, Half - PlayerUV.Y * DrawnPx));
+		}
+		MapImage->SetRenderTransformPivot(PlayerUV);
+		MapImage->SetRenderTransformAngle(-Yaw);
+	}
 
 	// 图标:世界偏移 → 屏幕偏移(上=+X 约定),再转同一角度。
 	const float K = GMinimapWindowPx / ViewSpan;
@@ -182,6 +212,7 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 		return FVector2D(CosA * Sx - SinA * Sy, SinA * Sx + CosA * Sy);
 	};
 
+	const bool bRound = MapMID != nullptr;   // 圆形遮罩下图标按半径裁剪/钳制
 	int32 IconIndex = 0;
 	for (const TWeakObjectPtr<AActor>& Enemy : EnemySources)
 	{
@@ -190,7 +221,10 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 			continue;
 		}
 		const FVector2D P = ToWindow(Enemy->GetActorLocation());
-		if (FMath::Abs(P.X) > Half - 4.f || FMath::Abs(P.Y) > Half - 4.f)
+		const bool bOutside = bRound
+			? P.Size() > Half - 10.f
+			: (FMath::Abs(P.X) > Half - 4.f || FMath::Abs(P.Y) > Half - 4.f);
+		if (bOutside)
 		{
 			continue;   // 敌人出窗即不画(方向指示只留给 NPC)
 		}
@@ -208,12 +242,24 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 			continue;   // 剑客离场(接单期间)时地图上也消失,与世界表现一致
 		}
 		FVector2D P = ToWindow(Npc->GetActorLocation());
-		const float Limit = Half - 8.f;
-		const bool bClamped = FMath::Abs(P.X) > Limit || FMath::Abs(P.Y) > Limit;
-		if (bClamped)
+		const float Limit = bRound ? Half - 14.f : Half - 8.f;
+		bool bClamped;
+		if (bRound)
 		{
-			P.X = FMath::Clamp(P.X, -Limit, Limit);
-			P.Y = FMath::Clamp(P.Y, -Limit, Limit);
+			bClamped = P.Size() > Limit;
+			if (bClamped && P.Size() > KINDA_SMALL_NUMBER)
+			{
+				P *= Limit / P.Size();   // 沿方向钳到圆环内侧
+			}
+		}
+		else
+		{
+			bClamped = FMath::Abs(P.X) > Limit || FMath::Abs(P.Y) > Limit;
+			if (bClamped)
+			{
+				P.X = FMath::Clamp(P.X, -Limit, Limit);
+				P.Y = FMath::Clamp(P.Y, -Limit, Limit);
+			}
 		}
 		FLinearColor Color = GMinimapNpcColor;
 		Color.A = bClamped ? 0.7f : 1.f;
