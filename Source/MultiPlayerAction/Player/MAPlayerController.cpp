@@ -5,6 +5,7 @@
 #include "UI/MAMatchStatusWidget.h"
 #include "UI/MAQuestTrackerWidget.h"
 #include "UI/MAAnnounceWidget.h"
+#include "UI/MAMinimapWidget.h"
 #include "UI/MAQuestJournalWidget.h"
 #include "UI/MAEscMenuWidget.h"
 #include "Online/MASessionSubsystem.h"
@@ -532,6 +533,14 @@ void AMAPlayerController::EnsureHUDInitialized()
 		if (AnnounceWidget)
 		{
 			AnnounceWidget->AddToViewport(3);
+		}
+	}
+	if (!MinimapWidget)
+	{
+		MinimapWidget = CreateWidget<UMAMinimapWidget>(this, UMAMinimapWidget::StaticClass());
+		if (MinimapWidget)
+		{
+			MinimapWidget->AddToViewport(1);
 		}
 	}
 	if (!ScoreboardWidget && ScoreboardWidgetClass)

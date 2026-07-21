@@ -132,6 +132,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class UMAAnnounceWidget> AnnounceWidget;
 
+	/** 右下角小地图（烘焙纹理滑动窗口 + 图标层）。纯 C++ 类直建，无 BP。 */
+	UPROPERTY()
+	TObjectPtr<class UMAMinimapWidget> MinimapWidget;
+
 	/** 任务日志面板（C++ 骨架 + lua 逻辑）。 */
 	UPROPERTY()
 	TObjectPtr<class UMAQuestJournalWidget> QuestJournalWidget;
