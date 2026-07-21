@@ -26,6 +26,7 @@ public:
 	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void Landed(const FHitResult& Hit) override;   // Server: fall damage(与玩家同规则)
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 

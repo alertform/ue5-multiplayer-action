@@ -22,6 +22,7 @@
 #include "AbilitySystemComponent.h"
 #include "GameplayTagContainer.h"
 #include "TimerManager.h"
+#include "Combat/MAFallDamage.h"
 #include "Network/MALagCompSubsystem.h"
 #include "Network/MAPredictionMovementComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -62,6 +63,14 @@ void AMultiPlayerActionCharacter::EndPlay(const EEndPlayReason::Type EndPlayReas
 		}
 	}
 	Super::EndPlay(EndPlayReason);
+}
+
+void AMultiPlayerActionCharacter::Landed(const FHitResult& Hit)
+{
+	// Landed 时刻 CMC 速度仍是落地竖直速度（引擎在此之后才清零）。
+	const float FallSpeed = FMath::Abs(FMath::Min(0.f, static_cast<float>(GetVelocity().Z)));
+	Super::Landed(Hit);
+	MAFallDamage::ApplyFallDamage(this, FallSpeed);
 }
 
 void AMultiPlayerActionCharacter::PossessedBy(AController* NewController)

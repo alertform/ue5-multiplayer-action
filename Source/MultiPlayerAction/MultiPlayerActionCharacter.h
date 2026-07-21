@@ -163,6 +163,7 @@ protected:
 
 	virtual void BeginPlay() override;                                   // Server: register with lag-comp
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void Landed(const FHitResult& Hit) override;                 // Server: fall damage
 
 	/** Grant default abilities to the ASC (server only) */
 	void GiveDefaultAbilities();

@@ -18,6 +18,7 @@
 #include "GameFramework/GameMode.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
+#include "Combat/MAFallDamage.h"
 #include "Network/MALagCompSubsystem.h"
 
 AMATargetDummy::AMATargetDummy()
@@ -151,6 +152,13 @@ void AMATargetDummy::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 	}
 	Super::EndPlay(EndPlayReason);
+}
+
+void AMATargetDummy::Landed(const FHitResult& Hit)
+{
+	const float FallSpeed = FMath::Abs(FMath::Min(0.f, static_cast<float>(GetVelocity().Z)));
+	Super::Landed(Hit);
+	MAFallDamage::ApplyFallDamage(this, FallSpeed);
 }
 
 UAbilitySystemComponent* AMATargetDummy::GetAbilitySystemComponent() const
