@@ -13,6 +13,9 @@ UGA_Block::UGA_Block()
 	Tags.AddTag(MAGameplayTags::Ability_Defense_Block);
 	SetAssetTags(Tags);
 
+	// 刀系技能需要持刀（出生赤手，拾取武器后授予 State.Armed）
+	ActivationRequiredTags.AddTag(MAGameplayTags::State_Armed);
+
 	// Guard cannot start mid-action; release-to-swing handles the other direction
 	// (melee lists State.Blocking in its blocked tags).
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);

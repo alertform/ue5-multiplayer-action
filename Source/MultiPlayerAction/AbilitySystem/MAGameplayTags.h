@@ -62,6 +62,7 @@ namespace MAGameplayTags
 	// Owned while blocking: gates damage mitigation in the ExecCalc, suppresses the normal
 	// hit react (GA_Block plays Block_Hit instead), and blocks starting an attack.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Blocking);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Armed);
 
 	// Dash slash — Motion-Warped root-motion katana dash. Asset tag + cooldown.
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Melee_DashSlash);

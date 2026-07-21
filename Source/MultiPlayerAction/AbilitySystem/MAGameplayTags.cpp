@@ -62,6 +62,9 @@ namespace MAGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Blocking, "State.Blocking",
 		"ActivationOwnedTags while UGA_Block holds: ExecCalc mitigates damage, GA_HitReact is suppressed, melee activation is blocked");
 
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Armed, "State.Armed",
+		"持刀状态（复制 loose tag）：刀系 GA（连招/突进斩/格挡）的 ActivationRequiredTags；拾取武器时服务器授予，AI 出生自带");
+
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Melee_DashSlash, "Ability.Melee.DashSlash",
 		"Asset tag for UGA_DashSlash — Motion-Warped root-motion dash attack (Q / gamepad Y)");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Data_DamageMultiplier, "Data.DamageMultiplier",

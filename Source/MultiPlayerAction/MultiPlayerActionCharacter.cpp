@@ -41,12 +41,37 @@ void AMultiPlayerActionCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 出生赤手：BP 默认的 WeaponMesh 可见，按 bArmed（默认 false）收起
+	ApplyArmedVisual();
+
 	if (HasAuthority())
 	{
 		if (UMALagCompSubsystem* LagComp = GetWorld()->GetSubsystem<UMALagCompSubsystem>())
 		{
 			LagComp->RegisterTarget(this);
 		}
+	}
+}
+
+void AMultiPlayerActionCharacter::SetArmed(bool bNewArmed)
+{
+	if (HasAuthority() && bArmed != bNewArmed)
+	{
+		bArmed = bNewArmed;
+		ApplyArmedVisual();
+	}
+}
+
+void AMultiPlayerActionCharacter::OnRep_Armed()
+{
+	ApplyArmedVisual();
+}
+
+void AMultiPlayerActionCharacter::ApplyArmedVisual()
+{
+	if (WeaponMesh)
+	{
+		WeaponMesh->SetVisibility(bArmed, true);
 	}
 }
 
@@ -85,6 +110,9 @@ void AMultiPlayerActionCharacter::PossessedBy(AController* NewController)
 		PS->GetAbilitySystemComponent()->InitAbilityActorInfo(PS, this);
 		GiveDefaultAbilities();
 		BindMoveSpeedDelegate();
+
+		// 重生同步：持刀状态权威在 PS 的 ASC（State.Armed 跨 pawn 存活），新 pawn 重建外观
+		SetArmed(PS->GetAbilitySystemComponent()->HasMatchingGameplayTag(MAGameplayTags::State_Armed));
 	}
 }
 
@@ -258,6 +286,7 @@ void AMultiPlayerActionCharacter::GetLifetimeReplicatedProps(TArray<FLifetimePro
 	// Skip the owner: the locally-controlled client sets bStrafeMode itself in SetStrafeMode, so the
 	// server only needs to push it out to the simulated proxies that can't see the local lock-on.
 	DOREPLIFETIME_CONDITION(AMultiPlayerActionCharacter, bStrafeMode, COND_SkipOwner);
+	DOREPLIFETIME(AMultiPlayerActionCharacter, bArmed);
 }
 
 void AMultiPlayerActionCharacter::SetStrafeMode(bool bEnabled)

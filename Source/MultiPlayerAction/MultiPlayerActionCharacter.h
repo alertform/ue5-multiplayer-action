@@ -165,6 +165,21 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Landed(const FHitResult& Hit) override;                 // Server: fall damage
 
+public:
+	/** server-only：设置持刀外观（WeaponMesh 显隐，复制）。ASC 侧 State.Armed 由调用方授予。 */
+	void SetArmed(bool bNewArmed);
+
+private:
+	/** 持刀外观镜像（权威在 ASC 的 State.Armed loose tag；重生时从 tag 重建）。 */
+	UPROPERTY(ReplicatedUsing = OnRep_Armed)
+	bool bArmed = false;
+
+	UFUNCTION()
+	void OnRep_Armed();
+	void ApplyArmedVisual();
+
+protected:
+
 	/** Grant default abilities to the ASC (server only) */
 	void GiveDefaultAbilities();
 

@@ -49,10 +49,16 @@ AActor* AMultiPlayerActionGameMode::ChoosePlayerStart_Implementation(AController
 		return Super::ChoosePlayerStart_Implementation(Player);
 	}
 
-	// Fisher-Yates 洗牌后取第一个附近没有活人 pawn 的；全被占则用洗牌首位。
+	// Fisher-Yates 洗牌后取第一个附近没有活人 pawn 且几何净空的；全不合格则用洗牌首位。
 	for (int32 i = Candidates.Num() - 1; i > 0; --i)
 	{
 		Candidates.Swap(i, FMath::RandRange(0, i));
+	}
+	// 几何净空校验用默认 pawn CDO（陷体出生点会让 SpawnActor 失败 → 观察者卡死，TrainStation 实测）
+	APawn* DefaultPawnCDO = nullptr;
+	if (const UClass* PawnClass = GetDefaultPawnClassForController(Player))
+	{
+		DefaultPawnCDO = PawnClass->GetDefaultObject<APawn>();
 	}
 	constexpr float OccupiedRadiusSq = 300.f * 300.f;
 	for (APlayerStart* Start : Candidates)
@@ -66,10 +72,16 @@ AActor* AMultiPlayerActionGameMode::ChoosePlayerStart_Implementation(AController
 				break;
 			}
 		}
-		if (!bOccupied)
+		if (bOccupied)
 		{
-			return Start;
+			continue;
 		}
+		if (DefaultPawnCDO && GetWorld()->EncroachingBlockingGeometry(
+				DefaultPawnCDO, Start->GetActorLocation(), Start->GetActorRotation()))
+		{
+			continue;
+		}
+		return Start;
 	}
 	return Candidates[0];
 }

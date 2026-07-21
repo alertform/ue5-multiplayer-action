@@ -26,6 +26,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	Tags.AddTag(MAGameplayTags::Ability_Melee_Attack);
 	SetAssetTags(Tags);
 
+	// 刀系技能需要持刀（出生赤手，拾取武器后授予 State.Armed）
+	ActivationRequiredTags.AddTag(MAGameplayTags::State_Armed);
+
 	// Cannot attack while dead — checked at TryActivate time, no need for runtime guard
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);
 	// No attacking out of a rooted cast — the melee montage would interrupt the fireball montage,

@@ -26,6 +26,9 @@ UGA_DashSlash::UGA_DashSlash()
 	Tags.AddTag(MAGameplayTags::Ability_Melee_DashSlash);
 	SetAssetTags(Tags);
 
+	// 刀系技能需要持刀（出生赤手，拾取武器后授予 State.Armed）
+	ActivationRequiredTags.AddTag(MAGameplayTags::State_Armed);
+
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Dead);
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Casting);
 	ActivationBlockedTags.AddTag(MAGameplayTags::State_Blocking);

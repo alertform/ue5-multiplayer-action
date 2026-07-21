@@ -56,6 +56,13 @@ void AMATargetDummy::PostInitializeComponents()
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+
+		// AI 天生持刀：刀系 GA 的 ActivationRequiredTags（玩家要捡武器，AI 不用）
+		if (HasAuthority())
+		{
+			AbilitySystemComponent->AddLooseGameplayTag(MAGameplayTags::State_Armed);
+			AbilitySystemComponent->AddReplicatedLooseGameplayTag(MAGameplayTags::State_Armed);
+		}
 	}
 
 	// AI 身体不许推玩家的弹簧臂：忽略 Camera 探测通道。放这里（而非构造函数）
