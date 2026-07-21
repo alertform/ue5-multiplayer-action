@@ -1,4 +1,4 @@
-# UE5 gitignore
+﻿# UE5 gitignore
 Binaries/
 Build/
 DerivedDataCache/
@@ -38,50 +38,50 @@ CLAUDE.md
 Plugins/Developer/
 
 # Local-only asset packs — marketplace content must not be redistributed in a public repo
-Content/MageBundleSamples/
+Content/External/MageBundleSamples/
 
 # StarterContent: ignore-all + per-file exemptions (dependency closure of ThirdPersonMap
 # dressing + committed FX blueprints; regenerate via MCP get_references BFS)
-Content/StarterContent/**
-!Content/StarterContent/**/
-!Content/StarterContent/Architecture/Pillar_50x500.uasset
-!Content/StarterContent/Materials/M_Basic_Wall.uasset
-!Content/StarterContent/Materials/M_Rock_Slate.uasset
-!Content/StarterContent/Particles/Materials/M_Burst.uasset
-!Content/StarterContent/Particles/Materials/M_Fire_SubUV.uasset
-!Content/StarterContent/Particles/Materials/M_Heat_Distortion.uasset
-!Content/StarterContent/Particles/Materials/M_Radial_Gradient.uasset
-!Content/StarterContent/Particles/Materials/M_Spark.uasset
-!Content/StarterContent/Particles/Materials/M_explosion_subUV.uasset
-!Content/StarterContent/Particles/Materials/M_radial_ramp.uasset
-!Content/StarterContent/Particles/Materials/M_smoke_subUV.uasset
-!Content/StarterContent/Particles/Materials/m_flare_01.uasset
-!Content/StarterContent/Particles/P_Explosion.uasset
-!Content/StarterContent/Particles/P_Fire.uasset
-!Content/StarterContent/Particles/P_Sparks.uasset
-!Content/StarterContent/Props/Materials/M_Rock.uasset
-!Content/StarterContent/Props/Materials/M_Statue.uasset
-!Content/StarterContent/Props/Materials/M_StatueGlass.uasset
-!Content/StarterContent/Props/SM_Rock.uasset
-!Content/StarterContent/Props/SM_Statue.uasset
-!Content/StarterContent/Textures/T_Burst_M.uasset
-!Content/StarterContent/Textures/T_Detail_Rocky_N.uasset
-!Content/StarterContent/Textures/T_Explosion_SubUV.uasset
-!Content/StarterContent/Textures/T_Fire_SubUV.uasset
-!Content/StarterContent/Textures/T_Fire_Tiled_D.uasset
-!Content/StarterContent/Textures/T_MacroVariation.uasset
-!Content/StarterContent/Textures/T_Perlin_Noise_M.uasset
-!Content/StarterContent/Textures/T_Rock_Basalt_D.uasset
-!Content/StarterContent/Textures/T_Rock_Slate_D.uasset
-!Content/StarterContent/Textures/T_Rock_Slate_N.uasset
-!Content/StarterContent/Textures/T_RockMesh_M.uasset
-!Content/StarterContent/Textures/T_RockMesh_N.uasset
-!Content/StarterContent/Textures/T_Smoke_SubUV.uasset
-!Content/StarterContent/Textures/T_Smoke_Tiled_D.uasset
-!Content/StarterContent/Textures/T_Spark_Core.uasset
-!Content/StarterContent/Textures/T_Statue_M.uasset
-!Content/StarterContent/Textures/T_Statue_N.uasset
-!Content/StarterContent/Textures/T_Water_N.uasset
+Content/External/StarterContent/**
+!Content/External/StarterContent/**/
+!Content/External/StarterContent/Architecture/Pillar_50x500.uasset
+!Content/External/StarterContent/Materials/M_Basic_Wall.uasset
+!Content/External/StarterContent/Materials/M_Rock_Slate.uasset
+!Content/External/StarterContent/Particles/Materials/M_Burst.uasset
+!Content/External/StarterContent/Particles/Materials/M_Fire_SubUV.uasset
+!Content/External/StarterContent/Particles/Materials/M_Heat_Distortion.uasset
+!Content/External/StarterContent/Particles/Materials/M_Radial_Gradient.uasset
+!Content/External/StarterContent/Particles/Materials/M_Spark.uasset
+!Content/External/StarterContent/Particles/Materials/M_explosion_subUV.uasset
+!Content/External/StarterContent/Particles/Materials/M_radial_ramp.uasset
+!Content/External/StarterContent/Particles/Materials/M_smoke_subUV.uasset
+!Content/External/StarterContent/Particles/Materials/m_flare_01.uasset
+!Content/External/StarterContent/Particles/P_Explosion.uasset
+!Content/External/StarterContent/Particles/P_Fire.uasset
+!Content/External/StarterContent/Particles/P_Sparks.uasset
+!Content/External/StarterContent/Props/Materials/M_Rock.uasset
+!Content/External/StarterContent/Props/Materials/M_Statue.uasset
+!Content/External/StarterContent/Props/Materials/M_StatueGlass.uasset
+!Content/External/StarterContent/Props/SM_Rock.uasset
+!Content/External/StarterContent/Props/SM_Statue.uasset
+!Content/External/StarterContent/Textures/T_Burst_M.uasset
+!Content/External/StarterContent/Textures/T_Detail_Rocky_N.uasset
+!Content/External/StarterContent/Textures/T_Explosion_SubUV.uasset
+!Content/External/StarterContent/Textures/T_Fire_SubUV.uasset
+!Content/External/StarterContent/Textures/T_Fire_Tiled_D.uasset
+!Content/External/StarterContent/Textures/T_MacroVariation.uasset
+!Content/External/StarterContent/Textures/T_Perlin_Noise_M.uasset
+!Content/External/StarterContent/Textures/T_Rock_Basalt_D.uasset
+!Content/External/StarterContent/Textures/T_Rock_Slate_D.uasset
+!Content/External/StarterContent/Textures/T_Rock_Slate_N.uasset
+!Content/External/StarterContent/Textures/T_RockMesh_M.uasset
+!Content/External/StarterContent/Textures/T_RockMesh_N.uasset
+!Content/External/StarterContent/Textures/T_Smoke_SubUV.uasset
+!Content/External/StarterContent/Textures/T_Smoke_Tiled_D.uasset
+!Content/External/StarterContent/Textures/T_Spark_Core.uasset
+!Content/External/StarterContent/Textures/T_Statue_M.uasset
+!Content/External/StarterContent/Textures/T_Statue_N.uasset
+!Content/External/StarterContent/Textures/T_Water_N.uasset
 
 # UnrealAgentMCP lives in its own private repo - do not track in the public game repo
 Plugins/UnrealAgentMCP/
