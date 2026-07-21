@@ -125,8 +125,53 @@ TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> FMALLMStreamRequest::Start(
 	}
 
 	Self->HttpRequest = Request;
+
+	// 看门狗：SetActivityTimeout 在流式响应下不可靠（实测挂死 36s 零回调），自查兜底。
+	Self->ActivityTimeoutSeconds = S->ActivityTimeoutSeconds;
+	Self->LastActivitySeconds = FPlatformTime::Seconds();
+	Self->WatchdogHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
+		[WeakSelf](float) -> bool
+		{
+			TSharedPtr<FMALLMStreamRequest, ESPMode::ThreadSafe> Pinned = WeakSelf.Pin();
+			if (!Pinned || Pinned->bFinished || Pinned->bCanceled)
+			{
+				return false;   // 请求已收尾，看门狗自灭
+			}
+			const double Idle = FPlatformTime::Seconds() - Pinned->LastActivitySeconds;
+			if (Idle < Pinned->ActivityTimeoutSeconds)
+			{
+				return true;
+			}
+			UE_LOG(LogMALLM, Warning, TEXT("流式请求看门狗超时：%.0fs 无数据，主动掐断"), Idle);
+			Pinned->bFinished = true;   // 先置位，让随后的 HTTP 完成回调静默落空
+			Pinned->bActive = false;
+			if (Pinned->HttpRequest.IsValid())
+			{
+				Pinned->HttpRequest->CancelRequest();
+			}
+			if (Pinned->Callbacks.OnError)
+			{
+				Pinned->Callbacks.OnError(TEXT("对话服务响应超时，请重试"));
+			}
+			return false;
+		}), 1.0f);
+
 	UE_LOG(LogMALLM, Log, TEXT("流式请求已发出：model=%s messages=%d"), *S->Model, Messages.Num());
 	return Self;
+}
+
+FMALLMStreamRequest::~FMALLMStreamRequest()
+{
+	StopWatchdog();
+}
+
+void FMALLMStreamRequest::StopWatchdog()
+{
+	if (WatchdogHandle.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(WatchdogHandle);
+		WatchdogHandle.Reset();
+	}
 }
 
 void FMALLMStreamRequest::Cancel()
@@ -138,14 +183,17 @@ void FMALLMStreamRequest::Cancel()
 	}
 	bCanceled = true;
 	bActive = false;
+	StopWatchdog();
 	if (HttpRequest.IsValid())
 	{
 		HttpRequest->CancelRequest();
 	}
+	UE_LOG(LogMALLM, Log, TEXT("流式请求已取消：已收 %d 字符"), Accumulated.Len());
 }
 
 void FMALLMStreamRequest::ProcessBytes(TArray<uint8> Bytes)
 {
+	LastActivitySeconds = FPlatformTime::Seconds();
 	if (bCanceled || bFinished)
 	{
 		return;
@@ -166,6 +214,9 @@ void FMALLMStreamRequest::ProcessBytes(TArray<uint8> Bytes)
 		{
 			bFinished = true;
 			bActive = false;
+			StopWatchdog();
+			UE_LOG(LogMALLM, Log, TEXT("流式请求完成（[DONE]）：chars=%d tools=%d finish=%s"),
+				Accumulated.Len(), ToolCallAggregator.GetCalls().Num(), *LastFinishReason);
 			if (UsagePromptTokens >= 0)
 			{
 				UE_LOG(LogMALLM, Log, TEXT("token 用量：prompt=%d completion=%d finish=%s"),
@@ -224,12 +275,15 @@ void FMALLMStreamRequest::HandleRequestComplete(FHttpRequestPtr /*Req*/, FHttpRe
 		return;
 	}
 	bFinished = true;
+	StopWatchdog();
 
 	const int32 Code = Resp.IsValid() ? Resp->GetResponseCode() : 0;
 
 	// 服务端正常关流但没发 [DONE]（部分兼容端点如此）——按成功收尾。
 	if (bConnectedOk && Code == 200)
 	{
+		UE_LOG(LogMALLM, Log, TEXT("流式请求完成（连接关闭）：chars=%d tools=%d finish=%s"),
+			Accumulated.Len(), ToolCallAggregator.GetCalls().Num(), *LastFinishReason);
 		if (Callbacks.OnComplete)
 		{
 			Callbacks.OnComplete(Accumulated, ToolCallAggregator.GetCalls());

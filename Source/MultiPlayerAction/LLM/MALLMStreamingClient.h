@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Containers/Ticker.h"
 #include "CoreMinimal.h"
 #include "Interfaces/IHttpRequest.h"
 #include "LLM/MALLMTypes.h"
@@ -50,12 +51,22 @@ public:
 
 	bool IsActive() const { return bActive; }
 
+	~FMALLMStreamRequest();
+
 private:
 	FMALLMStreamRequest() = default;
 
 	/** 游戏线程：喂解析器、派发 delta。 */
 	void ProcessBytes(TArray<uint8> Bytes);
 	void HandleRequestComplete(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bConnectedOk);
+
+	/** 自带活动看门狗：引擎 SetActivityTimeout 在流式响应下实测不触发（2026-07-21
+	 *  挂死 36s 无回调），改为每秒自查"距上次收到字节"并主动掐流报错。 */
+	void StopWatchdog();
+
+	FTSTicker::FDelegateHandle WatchdogHandle;
+	double LastActivitySeconds = 0.0;
+	float ActivityTimeoutSeconds = 30.f;
 
 	TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> HttpRequest;
 	FCallbacks Callbacks;
