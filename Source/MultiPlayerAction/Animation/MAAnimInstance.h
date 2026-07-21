@@ -53,6 +53,11 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Locomotion")
 	bool bStrafing = false;
 
+	/** 持刀否：AnimGraph 用它在休闲待机（赤手）与武士刀战斗待机之间切换。
+	 *  未持刀时 bStrafing 也被压回 false（赤手不该摆持刀 strafe 姿势）。 */
+	UPROPERTY(BlueprintReadOnly, Category = "Locomotion")
+	bool bArmed = false;
+
 protected:
 	/** Max torso twist in degrees (camera further off-axis than this gets clamped) */
 	UPROPERTY(EditDefaultsOnly, Category = "Aim", meta = (ClampMin = "0.0", UIMax = "120.0"))

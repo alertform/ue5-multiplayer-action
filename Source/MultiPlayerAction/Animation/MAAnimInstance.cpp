@@ -54,7 +54,10 @@ void UMAAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			const bool bStrafeMode = MACharacter ? MACharacter->IsStrafeMode() : true;
 			constexpr float ExitBand = 0.7f; // exit threshold = entry * 0.7
 			const float SpeedGate = StrafeSpeedThreshold * (bStrafing ? ExitBand : 1.f);
-			bStrafing = bStrafeMode && Velocity.Size2D() > SpeedGate;
+
+			// 持刀状态：玩家读复制镜像（赤手 = 休闲待机）；AI pawn 天生持刀。
+			bArmed = MACharacter ? MACharacter->IsArmed() : true;
+			bStrafing = bArmed && bStrafeMode && Velocity.Size2D() > SpeedGate;
 		}
 
 		// ASC lives on the PlayerState for players (character forwards via IAbilitySystemInterface);

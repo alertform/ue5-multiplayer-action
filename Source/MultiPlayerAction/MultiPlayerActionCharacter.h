@@ -169,6 +169,9 @@ public:
 	/** server-only：设置持刀外观（WeaponMesh 显隐，复制）。ASC 侧 State.Armed 由调用方授予。 */
 	void SetArmed(bool bNewArmed);
 
+	/** 持刀否（复制镜像；动画层读它切战斗/休闲待机）。 */
+	bool IsArmed() const { return bArmed; }
+
 private:
 	/** 持刀外观镜像（权威在 ASC 的 State.Armed loose tag；重生时从 tag 重建）。 */
 	UPROPERTY(ReplicatedUsing = OnRep_Armed)
