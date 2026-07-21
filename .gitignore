@@ -37,6 +37,14 @@ CLAUDE.md
 .vsconfig
 Plugins/Developer/
 
+# External packs default to LOCAL-ONLY (marketplace licenses + repo size).
+# New imports go to Content/External/<PackName>/ and are ignored automatically;
+# to ship specific packs/files, re-include them below (StarterContent block is the template).
+Content/External/*
+!Content/External/GhostSamurai_Bundle
+!Content/External/StarterContent
+!Content/External/MageBundleSamples
+
 # Local-only asset packs — marketplace content must not be redistributed in a public repo
 Content/External/MageBundleSamples/
 
