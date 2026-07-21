@@ -32,6 +32,10 @@ protected:
 	virtual bool ReadyToEndMatch_Implementation() override;
 	virtual void HandleMatchHasEnded() override;
 
+	/** 随机出生点：洗牌全部 PlayerStart 取第一个附近无活人的（引擎默认总选第一个）；
+	 *  编辑器"从此处游玩"（PlayerStartPIE）仍然优先。 */
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
 	/** Match clock length, seconds; <=0 = 不限时（剧情模式默认）。EditAnywhere: per-level tunable. */
 	UPROPERTY(EditAnywhere, Category = "Match")
 	float MatchDuration = 0.f;

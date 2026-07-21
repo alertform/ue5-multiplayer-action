@@ -7,7 +7,7 @@
 namespace
 {
 	/** Gameplay map the host travels into (and clients follow via session join). */
-	const TCHAR* const GameplayMapPath = TEXT("/Game/Maps/ThirdPersonMap");
+	const TCHAR* const GameplayMapPath = TEXT("/Game/External/LAKETOWN/MAPS/LAKETOWN");
 
 	/** Fixed lobby size — the menu no longer exposes a player-count field. */
 	const int32 DefaultMaxPlayers = 4;

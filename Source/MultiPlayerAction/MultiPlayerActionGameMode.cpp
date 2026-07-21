@@ -9,6 +9,8 @@
 #include "AbilitySystemComponent.h"
 #include "Narrative/MANarrativeSubsystem.h"
 #include "EngineUtils.h"
+#include "Engine/PlayerStartPIE.h"
+#include "GameFramework/PlayerStart.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -29,6 +31,47 @@ AMultiPlayerActionGameMode::AMultiPlayerActionGameMode()
 	{
 		DefaultPawnClass = PlayerPawnBPClass.Class;
 	}
+}
+
+AActor* AMultiPlayerActionGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	TArray<APlayerStart*> Candidates;
+	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+	{
+		if (It->IsA<APlayerStartPIE>())
+		{
+			return *It;   // 编辑器"从此处游玩"永远直达
+		}
+		Candidates.Add(*It);
+	}
+	if (Candidates.IsEmpty())
+	{
+		return Super::ChoosePlayerStart_Implementation(Player);
+	}
+
+	// Fisher-Yates 洗牌后取第一个附近没有活人 pawn 的；全被占则用洗牌首位。
+	for (int32 i = Candidates.Num() - 1; i > 0; --i)
+	{
+		Candidates.Swap(i, FMath::RandRange(0, i));
+	}
+	constexpr float OccupiedRadiusSq = 300.f * 300.f;
+	for (APlayerStart* Start : Candidates)
+	{
+		bool bOccupied = false;
+		for (TActorIterator<APawn> Pawn(GetWorld()); Pawn; ++Pawn)
+		{
+			if (FVector::DistSquared(Pawn->GetActorLocation(), Start->GetActorLocation()) < OccupiedRadiusSq)
+			{
+				bOccupied = true;
+				break;
+			}
+		}
+		if (!bOccupied)
+		{
+			return Start;
+		}
+	}
+	return Candidates[0];
 }
 
 void AMultiPlayerActionGameMode::InitGameState()
