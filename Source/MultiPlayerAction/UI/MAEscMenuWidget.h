@@ -1,7 +1,7 @@
 #pragma once
 
+#include "CommonActivatableWidget.h"
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "UnLuaInterface.h"
 #include "MAEscMenuWidget.generated.h"
 
@@ -10,16 +10,21 @@ class UTextBlock;
 class UVerticalBox;
 
 /**
- * ESC 菜单的 C++ 骨架：面板容器 + 按钮构件 API + UnLua 绑定。
- * 菜单有哪些项、点了做什么，全在 lua 模块 Content/Script/UI/EscMenu.lua ——
- * 加/删菜单项改 lua 即可，零重编（与任务日志同一套 C++ 骨架 + lua 逻辑分层）。
+ * ESC 菜单：CommonUI Activatable（由 UMAMenuHostWidget 的栈 push/pop）+ UnLua 内容层。
+ *  - 激活时 ActionRouter 自动切 Menu 输入模式 + 光标，反激活自动还原（PC 不再手工
+ *    SetInputMode）；ESC / 手柄 B 在 NativeOnKeyDown 里反激活（不依赖 CommonInput
+ *    的按键数据表配置）。
+ *  - 菜单有哪些项、点了做什么，仍全在 lua 模块 Content/Script/UI/EscMenu.lua。
+ *  - 期望焦点 = 第一个按钮 → 手柄方向键可在按钮间导航。
  */
 UCLASS()
-class MULTIPLAYERACTION_API UMAEscMenuWidget : public UUserWidget, public IUnLuaInterface
+class MULTIPLAYERACTION_API UMAEscMenuWidget : public UCommonActivatableWidget, public IUnLuaInterface
 {
 	GENERATED_BODY()
 
 public:
+	UMAEscMenuWidget(const FObjectInitializer& ObjectInitializer);
+
 	// IUnLuaInterface
 	virtual FString GetModuleName_Implementation() const override { return TEXT("UI.EscMenu"); }
 
@@ -37,8 +42,15 @@ public:
 
 protected:
 	virtual void NativeOnInitialized() override;
+	virtual void NativeOnActivated() override;
+	virtual UWidget* NativeGetDesiredFocusTarget() const override;
+	virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 private:
 	UPROPERTY()
 	TObjectPtr<UVerticalBox> ItemsBox;
+
+	UPROPERTY()
+	TObjectPtr<UButton> FirstButton;
 };

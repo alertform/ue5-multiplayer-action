@@ -5,6 +5,7 @@
 #include "UI/MAMatchStatusWidget.h"
 #include "UI/MAQuestTrackerWidget.h"
 #include "UI/MAAnnounceWidget.h"
+#include "UI/Common/MAMenuHostWidget.h"
 #include "UI/MAMinimapWidget.h"
 #include "UI/MASkillBarWidget.h"
 #include "UI/MAQuestJournalWidget.h"
@@ -111,41 +112,33 @@ void AMAPlayerController::ToggleEscMenu()
 	{
 		return; // 对话窗自己管 Esc
 	}
-	if (!EscMenuWidget)
+	if (!MenuHostWidget)
 	{
-		EscMenuWidget = CreateWidget<UMAEscMenuWidget>(this, UMAEscMenuWidget::StaticClass());
-		if (!EscMenuWidget)
+		MenuHostWidget = CreateWidget<UMAMenuHostWidget>(this, UMAMenuHostWidget::StaticClass());
+		if (!MenuHostWidget)
 		{
 			return;
 		}
-		EscMenuWidget->AddToViewport(20);
+		MenuHostWidget->AddToViewport(20);
 	}
-	if (EscMenuWidget->GetVisibility() == ESlateVisibility::Collapsed)
+	// CommonUI Activatable 栈：激活时 ActionRouter 自动切 Menu 输入模式 + 光标，
+	// 反激活自动还原游戏输入 —— 不再手工 SetInputMode。
+	if (MenuHostWidget->HasActive())
 	{
-		EscMenuWidget->SetVisibility(ESlateVisibility::Visible);
-		// GameAndUI：既能点按钮，Esc 再按一次也仍走本绑定关闭（多人不暂停，纯覆层）。
-		FInputModeGameAndUI InputMode;
-		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		InputMode.SetHideCursorDuringCapture(false);
-		SetInputMode(InputMode);
-		SetShowMouseCursor(true);
-		EscMenuWidget->OnMenuOpened(); // lua：首开建菜单项
+		MenuHostWidget->PopActive();
 	}
 	else
 	{
-		CloseEscMenu();
+		MenuHostWidget->Push(UMAEscMenuWidget::StaticClass());
 	}
 }
 
 void AMAPlayerController::CloseEscMenu()
 {
-	if (EscMenuWidget)
+	if (MenuHostWidget)
 	{
-		EscMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+		MenuHostWidget->PopActive();
 	}
-	FInputModeGameOnly InputMode;
-	SetInputMode(InputMode);
-	SetShowMouseCursor(false);
 }
 
 void AMAPlayerController::ReturnToMainMenu()

@@ -23,6 +23,8 @@ public class MultiPlayerAction : ModuleRules
 			// UI
 			"UMG", "Slate", "SlateCore",
 			"ModelViewViewModel", "FieldNotification",
+			// CommonUI：菜单 Activatable 栈 + 输入感知（键鼠/手柄），ESC 菜单容器
+			"CommonUI", "CommonInput",
 			// Camera shakes (UDefaultCameraShakeBase + Perlin pattern live in this plugin, enabled by default)
 			"EngineCameras",
 			// Root-motion warping for the dash slash

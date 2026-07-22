@@ -9,6 +9,7 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Input/UIActionBindingHandle.h"
 #include "Styling/CoreStyle.h"
 
 // unity build 防碰撞：file-local 常量带文件前缀。
@@ -17,10 +18,15 @@ static const FLinearColor GEscMenuTitle(1.0f, 0.78f, 0.35f, 1.f);
 static const FLinearColor GEscMenuBtn(1.f, 1.f, 1.f, 0.08f);
 static const FLinearColor GEscMenuBtnText(0.92f, 0.92f, 0.92f, 1.f);
 
+UMAEscMenuWidget::UMAEscMenuWidget(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	SetIsFocusable(true);   // 键盘/手柄事件要能路由到本 widget（NativeOnKeyDown 关菜单）
+}
+
 void UMAEscMenuWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
-	SetVisibility(ESlateVisibility::Collapsed); // 开合由 PC 控制
 
 	UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
 	WidgetTree->RootWidget = Root;
@@ -51,6 +57,35 @@ void UMAEscMenuWidget::NativeOnInitialized()
 	Stack->AddChildToVerticalBox(ItemsBox);
 }
 
+void UMAEscMenuWidget::NativeOnActivated()
+{
+	Super::NativeOnActivated();
+	OnMenuOpened();   // lua：本实例首开建菜单项（栈每次 push 都是新实例）
+}
+
+UWidget* UMAEscMenuWidget::NativeGetDesiredFocusTarget() const
+{
+	return FirstButton;   // 手柄：焦点落第一个按钮，方向键上下导航
+}
+
+TOptional<FUIInputConfig> UMAEscMenuWidget::GetDesiredInputConfig() const
+{
+	// Menu 模式：游戏输入截断、光标显示；反激活时 ActionRouter 自动还原上一配置。
+	return FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture);
+}
+
+FReply UMAEscMenuWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	const FKey Key = InKeyEvent.GetKey();
+	if (Key == EKeys::Escape || Key == EKeys::Gamepad_FaceButton_Right ||
+		Key == EKeys::Gamepad_Special_Right)
+	{
+		DeactivateWidget();
+		return FReply::Handled();
+	}
+	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+}
+
 UButton* UMAEscMenuWidget::AddButton(const FString& Label)
 {
 	if (!ItemsBox)
@@ -76,6 +111,10 @@ UButton* UMAEscMenuWidget::AddButton(const FString& Label)
 		BtnSlot->SetHorizontalAlignment(HAlign_Fill);
 		BtnSlot->SetPadding(FMargin(0.f, 4.f, 0.f, 0.f));
 	}
+	if (!FirstButton)
+	{
+		FirstButton = Button;
+	}
 	return Button;
 }
 
@@ -85,4 +124,5 @@ void UMAEscMenuWidget::ClearItems()
 	{
 		ItemsBox->ClearChildren();
 	}
+	FirstButton = nullptr;
 }

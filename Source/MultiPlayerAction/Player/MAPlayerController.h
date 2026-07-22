@@ -144,9 +144,9 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class UMAQuestJournalWidget> QuestJournalWidget;
 
-	/** ESC 菜单（C++ 骨架 + lua 菜单项）。 */
+	/** 菜单宿主（CommonUI Activatable 栈）：ESC 菜单 push 进栈，输入模式切换交给 ActionRouter。 */
 	UPROPERTY()
-	TObjectPtr<class UMAEscMenuWidget> EscMenuWidget;
+	TObjectPtr<class UMAMenuHostWidget> MenuHostWidget;
 
 	virtual void SetupInputComponent() override;
 

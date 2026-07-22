@@ -14,6 +14,9 @@ static TAutoConsoleVariable<float> CVarFallDamageSafeSpeed(
 static TAutoConsoleVariable<float> CVarFallDamagePerUnit(
 	TEXT("ma.FallDamage.DamagePerUnit"), 0.05f,
 	TEXT("Damage per uu/s above the safe landing speed (0.05: lethal at ~3400)."));
+static TAutoConsoleVariable<float> CVarFallDamageSpawnGrace(
+	TEXT("ma.FallDamage.SpawnGraceSeconds"), 3.f,
+	TEXT("No fall damage within N seconds of pawn creation (spawn drops must not kill)."));
 
 namespace MAFallDamage
 {
@@ -30,6 +33,11 @@ float Compute(float FallSpeed, float SafeSpeed, float DamagePerUnit)
 void ApplyFallDamage(ACharacter* Victim, float FallSpeed)
 {
 	if (!Victim || !Victim->HasAuthority() || !CVarFallDamageEnabled.GetValueOnGameThread())
+	{
+		return;
+	}
+	// 出生保护期：出生点若悬空，落地不该开局即死（重生同理）。
+	if (Victim->GetGameTimeSinceCreation() < CVarFallDamageSpawnGrace.GetValueOnGameThread())
 	{
 		return;
 	}
