@@ -38,6 +38,7 @@ static const FLinearColor GMinimapPathColor(1.f, 0.85f, 0.45f, 0.85f);   // 任�
 static constexpr float GMinimapPathSpacing = 250.f;   // 面包屑世界间距(uu)
 static constexpr float GMinimapPathRecompute = 0.35f; // 寻路重算间隔(s)
 static constexpr int32 GMinimapPathMaxDots = 48;
+static constexpr float GMinimapHeightThreshold = 250.f;   // Z 差超此在图标上标 ▲/▼
 
 void UMAMinimapWidget::NativeOnInitialized()
 {
@@ -161,6 +162,24 @@ UImage* UMAMinimapWidget::AcquirePathDot(int32 Index)
 	UImage* Dot = PathDots[Index];
 	Dot->SetVisibility(ESlateVisibility::HitTestInvisible);
 	return Dot;
+}
+
+UTextBlock* UMAMinimapWidget::AcquireChevron(int32 Index, float DeltaZ, const FLinearColor& Color)
+{
+	while (!ChevronPool.IsValidIndex(Index))
+	{
+		UTextBlock* T = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+		T->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 9));
+		T->SetShadowOffset(FVector2D(1.f, 1.f));
+		T->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.9f));
+		IconCanvas->AddChildToCanvas(T);
+		ChevronPool.Add(T);
+	}
+	UTextBlock* T = ChevronPool[Index];
+	T->SetVisibility(ESlateVisibility::HitTestInvisible);
+	T->SetText(FText::FromString(DeltaZ > 0.f ? TEXT("▲") : TEXT("▼")));   // 目标在上/在下
+	T->SetColorAndOpacity(FSlateColor(Color));
+	return T;
 }
 
 bool UMAMinimapWidget::ResolveObjectiveLocation(const APawn* Pawn, FVector& OutLoc) const
@@ -295,6 +314,22 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	};
 
 	const bool bRound = MapMID != nullptr;   // 圆形遮罩下图标按半径裁剪/钳制
+	int32 ChevronIndex = 0;
+	// 高度提示:目标 Z 与玩家 Z 差超阈值 → 图标上方标 ▲(在上)/▼(在下)。
+	auto MaybeChevron = [&](const FVector& WorldPos, const FVector2D& IconP, const FLinearColor& Color)
+	{
+		const float Dz = static_cast<float>(WorldPos.Z - PawnLoc.Z);
+		if (FMath::Abs(Dz) < GMinimapHeightThreshold)
+		{
+			return;
+		}
+		UTextBlock* Ch = AcquireChevron(ChevronIndex++, Dz, Color);
+		if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(Ch->Slot))
+		{
+			S->SetAutoSize(true);
+			S->SetPosition(FVector2D(Half + IconP.X - 4.f, Half + IconP.Y - 13.f));
+		}
+	};
 
 	// --- 任务路径面包屑：节流寻路(NavMesh，无网格退化直线)，每帧重投影 ---
 	PathRecomputeCooldown -= InDeltaTime;
@@ -381,6 +416,7 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 			S->SetSize(FVector2D(7.f, 7.f));
 			S->SetPosition(FVector2D(Half + P.X - 3.5f, Half + P.Y - 3.5f));
 		}
+		MaybeChevron(Enemy->GetActorLocation(), P, GMinimapEnemyColor);
 	}
 	for (const TWeakObjectPtr<AActor>& Npc : NpcSources)
 	{
@@ -415,6 +451,10 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 		{
 			S->SetSize(FVector2D(9.f, 9.f));
 			S->SetPosition(FVector2D(Half + P.X - 4.5f, Half + P.Y - 4.5f));
+		}
+		if (!bClamped)
+		{
+			MaybeChevron(Npc->GetActorLocation(), P, GMinimapNpcColor);   // 钳边时不叠(方向已由钳位表达)
 		}
 	}
 	for (const TWeakObjectPtr<AActor>& Pickup : PickupSources)
@@ -457,5 +497,9 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	for (int32 i = IconIndex; i < IconPool.Num(); ++i)
 	{
 		IconPool[i]->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	for (int32 i = ChevronIndex; i < ChevronPool.Num(); ++i)
+	{
+		ChevronPool[i]->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }

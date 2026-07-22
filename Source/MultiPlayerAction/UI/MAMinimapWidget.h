@@ -30,6 +30,8 @@ private:
 	void RefreshIconSources();
 	UImage* AcquireIcon(int32 Index, const FLinearColor& Color);
 	UImage* AcquirePathDot(int32 Index);
+	/** 高度提示 ▲/▼：目标与玩家 Z 差超阈值时在图标上方显示，返回复用的 TextBlock。 */
+	class UTextBlock* AcquireChevron(int32 Index, float DeltaZ, const FLinearColor& Color);
 
 	/** 客户端解析当前任务目标世界坐标（任务进行→最近存活敌人，否则→可见 NPC）。 */
 	bool ResolveObjectiveLocation(const APawn* Pawn, FVector& OutLoc) const;
@@ -64,6 +66,10 @@ private:
 	/** 路径面包屑点池。 */
 	UPROPERTY()
 	TArray<TObjectPtr<UImage>> PathDots;
+
+	/** 高度提示 ▲/▼ 池（跟随敌人/NPC 图标）。 */
+	UPROPERTY()
+	TArray<TObjectPtr<class UTextBlock>> ChevronPool;
 
 	UPROPERTY()
 	TWeakObjectPtr<AMAMapDefinition> MapDef;
