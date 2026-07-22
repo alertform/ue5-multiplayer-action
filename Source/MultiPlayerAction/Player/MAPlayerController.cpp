@@ -7,6 +7,7 @@
 #include "UI/MAAnnounceWidget.h"
 #include "UI/Common/MAMenuHostWidget.h"
 #include "UI/MAMinimapWidget.h"
+#include "UI/MAObjectiveMarkerWidget.h"
 #include "UI/MASkillBarWidget.h"
 #include "UI/MAQuestJournalWidget.h"
 #include "UI/MAEscMenuWidget.h"
@@ -543,6 +544,14 @@ void AMAPlayerController::EnsureHUDInitialized()
 		if (SkillBarWidget)
 		{
 			SkillBarWidget->AddToViewport(1);
+		}
+	}
+	if (!ObjectiveMarkerWidget)
+	{
+		ObjectiveMarkerWidget = CreateWidget<UMAObjectiveMarkerWidget>(this, UMAObjectiveMarkerWidget::StaticClass());
+		if (ObjectiveMarkerWidget)
+		{
+			ObjectiveMarkerWidget->AddToViewport(2);
 		}
 	}
 	if (!ScoreboardWidget && ScoreboardWidgetClass)

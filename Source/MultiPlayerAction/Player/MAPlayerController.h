@@ -140,6 +140,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class UMASkillBarWidget> SkillBarWidget;
 
+	/** 任务导航标记（屏幕空间目标指引：屏内浮标 / 出屏边缘箭头）。纯 C++ 类直建，无 BP。 */
+	UPROPERTY()
+	TObjectPtr<class UMAObjectiveMarkerWidget> ObjectiveMarkerWidget;
+
 	/** 任务日志面板（C++ 骨架 + lua 逻辑）。 */
 	UPROPERTY()
 	TObjectPtr<class UMAQuestJournalWidget> QuestJournalWidget;
