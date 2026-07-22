@@ -136,6 +136,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class UMAMinimapWidget> MinimapWidget;
 
+	/** 右下角横排圆形技能槽（取代 WBP_HUD 底部中置条）。纯 C++ 类直建，无 BP。 */
+	UPROPERTY()
+	TObjectPtr<class UMASkillBarWidget> SkillBarWidget;
+
 	/** 任务日志面板（C++ 骨架 + lua 逻辑）。 */
 	UPROPERTY()
 	TObjectPtr<class UMAQuestJournalWidget> QuestJournalWidget;

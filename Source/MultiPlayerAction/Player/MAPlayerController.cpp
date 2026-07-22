@@ -6,6 +6,7 @@
 #include "UI/MAQuestTrackerWidget.h"
 #include "UI/MAAnnounceWidget.h"
 #include "UI/MAMinimapWidget.h"
+#include "UI/MASkillBarWidget.h"
 #include "UI/MAQuestJournalWidget.h"
 #include "UI/MAEscMenuWidget.h"
 #include "Online/MASessionSubsystem.h"
@@ -541,6 +542,14 @@ void AMAPlayerController::EnsureHUDInitialized()
 		if (MinimapWidget)
 		{
 			MinimapWidget->AddToViewport(1);
+		}
+	}
+	if (!SkillBarWidget)
+	{
+		SkillBarWidget = CreateWidget<UMASkillBarWidget>(this, UMASkillBarWidget::StaticClass());
+		if (SkillBarWidget)
+		{
+			SkillBarWidget->AddToViewport(1);
 		}
 	}
 	if (!ScoreboardWidget && ScoreboardWidgetClass)
