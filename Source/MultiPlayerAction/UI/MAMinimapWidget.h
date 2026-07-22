@@ -61,9 +61,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> MapMID;
 
-	/** 图标数据源（节流扫描）：敌人 pawn 与对话 NPC。 */
+	/** 图标数据源（节流扫描）：敌人 pawn、对话 NPC、武器拾取物。 */
 	TArray<TWeakObjectPtr<AActor>> EnemySources;
 	TArray<TWeakObjectPtr<AActor>> NpcSources;
+	TArray<TWeakObjectPtr<AActor>> PickupSources;
 	float SourceScanCooldown = 0.f;
 	bool bMapDefSearched = false;
 };

@@ -13,6 +13,7 @@
 #include "Components/TextBlock.h"
 #include "Dialogue/MADialogueComponent.h"
 #include "EngineUtils.h"
+#include "Items/MAWeaponPickup.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Styling/CoreStyle.h"
@@ -28,6 +29,7 @@ static constexpr float GMinimapWindowPx = 216.f;   // 内容区边长(SizeBox 22
 static constexpr float GMinimapScanInterval = 0.5f;
 static const FLinearColor GMinimapEnemyColor(0.9f, 0.15f, 0.1f, 1.f);
 static const FLinearColor GMinimapNpcColor(0.35f, 0.85f, 1.f, 1.f);
+static const FLinearColor GMinimapPickupColor(1.f, 0.78f, 0.35f, 1.f);   // HUD 金色系:武器拾取物
 
 void UMAMinimapWidget::NativeOnInitialized()
 {
@@ -108,6 +110,11 @@ void UMAMinimapWidget::RefreshIconSources()
 			NpcSources.Add(It->GetOwner());
 		}
 	}
+	PickupSources.Reset();
+	for (TActorIterator<AMAWeaponPickup> It(World); It; ++It)
+	{
+		PickupSources.Add(*It);
+	}
 }
 
 UImage* UMAMinimapWidget::AcquireIcon(int32 Index, const FLinearColor& Color)
@@ -121,6 +128,7 @@ UImage* UMAMinimapWidget::AcquireIcon(int32 Index, const FLinearColor& Color)
 	UImage* Icon = IconPool[Index];
 	Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
 	Icon->SetColorAndOpacity(Color);
+	Icon->SetRenderTransformAngle(0.f);   // 池化复用:清掉上一位使用者的旋转(拾取物菱形 45°)
 	return Icon;
 }
 
@@ -270,6 +278,43 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 			S->SetPosition(FVector2D(Half + P.X - 4.5f, Half + P.Y - 4.5f));
 		}
 	}
+	for (const TWeakObjectPtr<AActor>& Pickup : PickupSources)
+	{
+		if (!Pickup.IsValid())
+		{
+			continue;   // 被捡走即从图上消失
+		}
+		FVector2D P = ToWindow(Pickup->GetActorLocation());
+		const float Limit = bRound ? Half - 14.f : Half - 8.f;
+		bool bClamped;
+		if (bRound)
+		{
+			bClamped = P.Size() > Limit;
+			if (bClamped && P.Size() > KINDA_SMALL_NUMBER)
+			{
+				P *= Limit / P.Size();
+			}
+		}
+		else
+		{
+			bClamped = FMath::Abs(P.X) > Limit || FMath::Abs(P.Y) > Limit;
+			if (bClamped)
+			{
+				P.X = FMath::Clamp(P.X, -Limit, Limit);
+				P.Y = FMath::Clamp(P.Y, -Limit, Limit);
+			}
+		}
+		FLinearColor Color = GMinimapPickupColor;
+		Color.A = bClamped ? 0.75f : 1.f;
+		UImage* Icon = AcquireIcon(IconIndex++, Color);
+		Icon->SetRenderTransformAngle(45.f);   // 菱形区分于敌人方点/NPC 方点
+		if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(Icon->Slot))
+		{
+			S->SetSize(FVector2D(9.f, 9.f));
+			S->SetPosition(FVector2D(Half + P.X - 4.5f, Half + P.Y - 4.5f));
+		}
+	}
+
 	for (int32 i = IconIndex; i < IconPool.Num(); ++i)
 	{
 		IconPool[i]->SetVisibility(ESlateVisibility::Collapsed);
