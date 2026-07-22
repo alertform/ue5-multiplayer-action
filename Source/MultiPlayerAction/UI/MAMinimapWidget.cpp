@@ -16,6 +16,10 @@
 #include "Items/MAWeaponPickup.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "NavigationPath.h"
+#include "NavigationSystem.h"
+#include "Narrative/MAQuestTypes.h"
+#include "Player/MAPlayerState.h"
 #include "Styling/CoreStyle.h"
 #include "UObject/UObjectIterator.h"
 #include "World/MAMapDefinition.h"
@@ -30,6 +34,10 @@ static constexpr float GMinimapScanInterval = 0.5f;
 static const FLinearColor GMinimapEnemyColor(0.9f, 0.15f, 0.1f, 1.f);
 static const FLinearColor GMinimapNpcColor(0.35f, 0.85f, 1.f, 1.f);
 static const FLinearColor GMinimapPickupColor(1.f, 0.78f, 0.35f, 1.f);   // HUD 金色系:武器拾取物
+static const FLinearColor GMinimapPathColor(1.f, 0.85f, 0.45f, 0.85f);   // 任务路径面包屑
+static constexpr float GMinimapPathSpacing = 250.f;   // 面包屑世界间距(uu)
+static constexpr float GMinimapPathRecompute = 0.35f; // 寻路重算间隔(s)
+static constexpr int32 GMinimapPathMaxDots = 48;
 
 void UMAMinimapWidget::NativeOnInitialized()
 {
@@ -65,6 +73,15 @@ void UMAMinimapWidget::NativeOnInitialized()
 	}
 	MapImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("MapImage"));
 	ClipPanel->AddChildToCanvas(MapImage);
+
+	// 路径层在地图之上、图标之下（Overlay 添加顺序即 z 序）。
+	PathCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("PathCanvas"));
+	PathCanvas->SetClipping(EWidgetClipping::ClipToBounds);
+	if (UOverlaySlot* S = Stack->AddChildToOverlay(PathCanvas))
+	{
+		S->SetHorizontalAlignment(HAlign_Fill);
+		S->SetVerticalAlignment(VAlign_Fill);
+	}
 
 	IconCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("IconCanvas"));
 	IconCanvas->SetClipping(EWidgetClipping::ClipToBounds);
@@ -130,6 +147,63 @@ UImage* UMAMinimapWidget::AcquireIcon(int32 Index, const FLinearColor& Color)
 	Icon->SetColorAndOpacity(Color);
 	Icon->SetRenderTransformAngle(0.f);   // 池化复用:清掉上一位使用者的旋转(拾取物菱形 45°)
 	return Icon;
+}
+
+UImage* UMAMinimapWidget::AcquirePathDot(int32 Index)
+{
+	while (!PathDots.IsValidIndex(Index))
+	{
+		UImage* Dot = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+		Dot->SetColorAndOpacity(GMinimapPathColor);
+		PathCanvas->AddChildToCanvas(Dot);
+		PathDots.Add(Dot);
+	}
+	UImage* Dot = PathDots[Index];
+	Dot->SetVisibility(ESlateVisibility::HitTestInvisible);
+	return Dot;
+}
+
+bool UMAMinimapWidget::ResolveObjectiveLocation(const APawn* Pawn, FVector& OutLoc) const
+{
+	const APlayerController* PC = GetOwningPlayer();
+	const AMAPlayerState* PS = PC ? PC->GetPlayerState<AMAPlayerState>() : nullptr;
+	if (!PS)
+	{
+		return false;
+	}
+	if (PS->GetActiveQuest().Phase == EMAQuestPhase::Active)
+	{
+		const AActor* Nearest = nullptr;
+		float BestSq = TNumericLimits<float>::Max();
+		for (const TWeakObjectPtr<AActor>& E : EnemySources)
+		{
+			if (!E.IsValid() || E->IsHidden())
+			{
+				continue;
+			}
+			const float DSq = FVector::DistSquared(E->GetActorLocation(), Pawn->GetActorLocation());
+			if (DSq < BestSq)
+			{
+				BestSq = DSq;
+				Nearest = E.Get();
+			}
+		}
+		if (Nearest)
+		{
+			OutLoc = Nearest->GetActorLocation();
+			return true;
+		}
+		return false;
+	}
+	for (const TWeakObjectPtr<AActor>& N : NpcSources)
+	{
+		if (N.IsValid() && !N->IsHidden())
+		{
+			OutLoc = N->GetActorLocation();
+			return true;
+		}
+	}
+	return false;
 }
 
 void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -221,6 +295,71 @@ void UMAMinimapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	};
 
 	const bool bRound = MapMID != nullptr;   // 圆形遮罩下图标按半径裁剪/钳制
+
+	// --- 任务路径面包屑：节流寻路(NavMesh，无网格退化直线)，每帧重投影 ---
+	PathRecomputeCooldown -= InDeltaTime;
+	if (PathRecomputeCooldown <= 0.f)
+	{
+		PathRecomputeCooldown = GMinimapPathRecompute;
+		CachedPathPoints.Reset();
+		FVector TargetLoc;
+		if (ResolveObjectiveLocation(Pawn, TargetLoc))
+		{
+			UNavigationPath* NavPath = UNavigationSystemV1::FindPathToLocationSynchronously(
+				GetWorld(), PawnLoc, TargetLoc);
+			if (NavPath && NavPath->IsValid() && NavPath->PathPoints.Num() >= 2)
+			{
+				CachedPathPoints = NavPath->PathPoints;
+			}
+			else
+			{
+				CachedPathPoints = { PawnLoc, TargetLoc };   // 无导航网格 / 不可达：直线兜底
+			}
+		}
+	}
+
+	int32 DotIndex = 0;
+	if (CachedPathPoints.Num() >= 2)
+	{
+		const float PathRadius = Half - 6.f;
+		const float MaxArc = ViewSpan;   // 窗口外的路径不可见，弧长超此即停止行走
+		// 沿折线按累计弧长等距取点：NextDot=下一颗面包屑的弧长位置(从起点算)。
+		float SegStart = 0.f;
+		float NextDot = GMinimapPathSpacing;   // 跳过起点(玩家自身,被 ▲ 覆盖)
+		for (int32 i = 0; i + 1 < CachedPathPoints.Num() && DotIndex < GMinimapPathMaxDots && SegStart < MaxArc; ++i)
+		{
+			const FVector SegA = CachedPathPoints[i];
+			const FVector SegB = CachedPathPoints[i + 1];
+			const float SegLen = FVector::Dist2D(SegA, SegB);
+			if (SegLen < 1.f)
+			{
+				continue;
+			}
+			const FVector SegDir = (SegB - SegA) / SegLen;
+			const float SegEnd = SegStart + SegLen;
+			while (NextDot <= SegEnd && NextDot <= MaxArc && DotIndex < GMinimapPathMaxDots)
+			{
+				const FVector2D P = ToWindow(SegA + SegDir * (NextDot - SegStart));
+				NextDot += GMinimapPathSpacing;
+				if (P.Size() > PathRadius)
+				{
+					continue;   // 超出圆形窗口的点不画(远端自然截断在边缘)
+				}
+				UImage* Dot = AcquirePathDot(DotIndex++);
+				if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(Dot->Slot))
+				{
+					S->SetSize(FVector2D(5.f, 5.f));
+					S->SetPosition(FVector2D(Half + P.X - 2.5f, Half + P.Y - 2.5f));
+				}
+			}
+			SegStart = SegEnd;
+		}
+	}
+	for (int32 i = DotIndex; i < PathDots.Num(); ++i)
+	{
+		PathDots[i]->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
 	int32 IconIndex = 0;
 	for (const TWeakObjectPtr<AActor>& Enemy : EnemySources)
 	{

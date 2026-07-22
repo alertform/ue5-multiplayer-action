@@ -29,6 +29,10 @@ protected:
 private:
 	void RefreshIconSources();
 	UImage* AcquireIcon(int32 Index, const FLinearColor& Color);
+	UImage* AcquirePathDot(int32 Index);
+
+	/** 客户端解析当前任务目标世界坐标（任务进行→最近存活敌人，否则→可见 NPC）。 */
+	bool ResolveObjectiveLocation(const APawn* Pawn, FVector& OutLoc) const;
 
 	/** 内容盒（根保持可见，Collapsed 根不 tick —— 项目既有教训）。 */
 	UPROPERTY()
@@ -43,6 +47,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UImage> MapImage;
 
+	/** 任务路径面包屑层（在地图之上、图标之下）。 */
+	UPROPERTY()
+	TObjectPtr<UCanvasPanel> PathCanvas;
+
 	UPROPERTY()
 	TObjectPtr<UCanvasPanel> IconCanvas;
 
@@ -52,6 +60,10 @@ private:
 	/** 图标池（按帧复用，多余的收起）。 */
 	UPROPERTY()
 	TArray<TObjectPtr<UImage>> IconPool;
+
+	/** 路径面包屑点池。 */
+	UPROPERTY()
+	TArray<TObjectPtr<UImage>> PathDots;
 
 	UPROPERTY()
 	TWeakObjectPtr<AMAMapDefinition> MapDef;
@@ -67,4 +79,8 @@ private:
 	TArray<TWeakObjectPtr<AActor>> PickupSources;
 	float SourceScanCooldown = 0.f;
 	bool bMapDefSearched = false;
+
+	/** 缓存的任务路径世界点（节流寻路，每帧重投影到窗口）。 */
+	TArray<FVector> CachedPathPoints;
+	float PathRecomputeCooldown = 0.f;
 };
