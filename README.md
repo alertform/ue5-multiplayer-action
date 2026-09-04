@@ -4,12 +4,6 @@ Story-driven multiplayer action demo built on Unreal Engine 5.5 — a katana com
 
 > Built alongside (and largely *with*) **UnrealAgentMCP** — a self-developed in-editor MCP server (77 tools) that lets an AI agent author Blueprints, UMG, AnimGraphs, BehaviorTrees, montages, Niagara systems, material graphs (including HLSL Custom nodes), IK retargeting and level content directly inside the running editor. Most of this project's content-side work was authored agent-side through it. The plugin is developed in a separate **private** repo (demo available on request); it is not required to build or run this project.
 
-| | |
-|---|---|
-| ![Arena vista](docs/screenshots/arena_vista.png) | ![Arena rocks](docs/screenshots/arena_rocks.png) |
-| ![Combat + kill feed](docs/screenshots/combat_killfeed.png) | ![Scoreboard](docs/screenshots/scoreboard.png) |
-| ![Ragdoll + kill feed](docs/screenshots/ragdoll_killfeed.png) | ![Post-match results](docs/screenshots/postmatch.png) |
-
 ---
 
 ## Highlights
